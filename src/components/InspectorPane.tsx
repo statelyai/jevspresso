@@ -64,9 +64,8 @@ export function InspectorPane({ actor }: { actor: AnyActor }) {
         selectedSessionId: actor.sessionId,
         serializeSnapshot,
         extractMachine: machineExtractor(sources),
-        // The editor's inspect page, as in statelyai/agent's demo: it converts
-        // source text into graphs. Sky's own viewer cannot (its convert call
-        // is rejected without the room id).
+        // The Stately editor's inspect page, which draws each machine from
+        // its source text.
         inspectorBaseUrl: 'https://editor.stately.ai/inspect',
       });
       const subscription = inspector.attach(actor);

@@ -9,7 +9,7 @@ import { defineConfig } from 'vite';
  *
  * With `@cloudflare/vite-plugin` 1.55 + `@tanstack/react-start` 1.168, running
  * `vite dev` inside the workerd runtime fails to resolve split server functions
- * ("Invalid server function ID: …"), so the two jev calls 500 in dev. The build
+ * ("Invalid server function ID: …"), so the two Jev calls 500 in dev. The build
  * output is unaffected and deploys to Workers as normal, so dev runs on Node and
  * the Workers runtime is used for the real thing. Drop the `command` check once
  * that combination is fixed upstream.

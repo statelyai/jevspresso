@@ -34,7 +34,7 @@ body {
   background-color: #6b6862;
 }
 
-/* Amendment 1: no monospace anywhere. Numbers that tick or count get
+/* No monospace anywhere. Numbers that tick or count get
    tabular figures instead, so columns stay steady without a mono face. */
 .tnum {
   font-variant-numeric: tabular-nums;
@@ -51,7 +51,7 @@ body {
   font-feature-settings: 'tnum' 1;
 }
 
-/* Amendment 3: two-line clamp where the full meaning matters (decision
+/* Two-line clamp where the full meaning matters (decision
    reasons); everything else truncates to one line. */
 .clamp-2 {
   display: -webkit-box;

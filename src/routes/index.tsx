@@ -30,7 +30,7 @@ export const Route = createFileRoute('/')({
   component: Page,
 });
 
-const REPO = 'https://github.com/davidkpiano/jevspresso';
+const REPO = 'https://github.com/statelyai/jevspresso';
 
 function Page() {
   const serverHasKey = Route.useLoaderData();
@@ -67,7 +67,7 @@ function NeedsKey({ onKey }: { onKey: (key: string) => void }) {
           className="flex h-11 items-center justify-center gap-2 rounded-lg border border-[#3a3936] text-sm text-[#faf9f5] hover:border-[#6b6862]"
         >
           Run it locally
-          <span className="text-[#a8a49c]">github.com/davidkpiano/jevspresso</span>
+          <span className="text-[#a8a49c]">github.com/statelyai/jevspresso</span>
         </a>
         <form
           className="flex flex-col gap-2"

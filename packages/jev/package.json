@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Let jev (TypeSafe's System One model) choose the next event for an XState v6 actor",
+  "description": "Let Jev (TypeSafe's System One model) choose the next event for an XState v6 actor",
   "exports": {
     ".": "./src/index.ts"
   },

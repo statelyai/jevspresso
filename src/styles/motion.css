@@ -1,4 +1,4 @@
-/* transitions-dev — copy this :root block into your project once.
+/* Motion tokens and transition snippets adapted from transitions.dev.
    Every transition snippet reads from these semantic names. */
 :root {
   /* ── Motion tokens — shared scale ──────────────────────────────
@@ -286,8 +286,7 @@
 }
 
 /* ------------------------------------------------------------------
-   transitions.dev snippets, installed verbatim from the skill's
-   reference files. Each keeps its prefers-reduced-motion guard.
+   transitions.dev snippets. Each keeps its prefers-reduced-motion guard.
    ------------------------------------------------------------------ */
 
 /* 02-number-pop-in.md — inventory quantities, confidence, latency. */
@@ -325,7 +324,7 @@
   .t-digit-group .t-digit { animation: none !important; }
 }
 
-/* 04-text-states-swap.md — machine caption strips and the jev callout. */
+/* 04-text-states-swap.md — machine caption strips and the Jev callout. */
 .t-text-swap {
   display: inline-block;
   transform: translateY(0);

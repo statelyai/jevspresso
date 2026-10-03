@@ -22,7 +22,7 @@ const bar = createMachine({
     events: {
       'barista.tamp': z.object({ drinkId: z.string() }),
       'barista.repair': z.object({ device: z.enum(['grinder', 'groupHead', 'steamWand']) }),
-      // Not chosen by jev: types<T>() is fine here.
+      // Not chosen by Jev: types<T>() is fine here.
       BREAK: types<{ device: string }>(),
     },
   },
@@ -300,6 +300,9 @@ const answers = (await typesafe.systemOne({ state, questions })).answers;
 - `pickEvents(machine, descriptors)`: see [Sharing event schemas](#sharing-event-schemas).
 - `requestKey(snapshot, options, input?)`: the fingerprint of the request `decide` would send now, or `null` when there is nothing to choose. Makes no request.
 - `memoizeClient(client, { max }?)`: see [Caching](#caching).
+- `logClient(client, onEntry)`: see [Logging](#logging).
+- `machineMap(snapshot)`: the machine as `map: true` shows it to Jev. See [Options](#options).
+- `tellLoop(options, loop)`: options that tell Jev about a loop, for a driver of your own. See [Loops](#loops).
 - `detectLoop(recentDecisions, settings?)`: a `JevLoop` (`kind`, `count`, `chosen`, `message`) or `null`. See [Loops](#loops).
 - `mockAnswers(request, score?)`: see [Client](#client).
 - Types: `JevOptions`, `JevOptionsFor`, `JevOption`, `JevDecision`, `JevClient`, `JevRequest`, `JevResponse`, `JevLogicEvent`, `JevLogicReply`, …
