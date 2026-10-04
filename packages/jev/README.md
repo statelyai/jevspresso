@@ -294,9 +294,12 @@ const answers = (await typesafe.systemOne({ state, questions })).answers;
 
 ## Exports
 
+<!-- public exports from packages/jev/src/index.ts -->
+
 - `decide(snapshot, options, input?)`: one decision. Delivers nothing.
 - `createJevLogic(options)`: see [`createJevLogic`](#createjevlogic).
 - `getOptions(snapshot, options, input?)`: the options Jev would be offered, without a request.
+- `optionId(event)`: the readable, stable ID used for an event option.
 - `pickEvents(machine, descriptors)`: see [Sharing event schemas](#sharing-event-schemas).
 - `requestKey(snapshot, options, input?)`: the fingerprint of the request `decide` would send now, or `null` when there is nothing to choose. Makes no request.
 - `memoizeClient(client, { max }?)`: see [Caching](#caching).
@@ -305,4 +308,5 @@ const answers = (await typesafe.systemOne({ state, questions })).answers;
 - `tellLoop(options, loop)`: options that tell Jev about a loop, for a driver of your own. See [Loops](#loops).
 - `detectLoop(recentDecisions, settings?)`: a `JevLoop` (`kind`, `count`, `chosen`, `message`) or `null`. See [Loops](#loops).
 - `mockAnswers(request, score?)`: see [Client](#client).
+- `NOOP_ID`: the raw-request key for the noop option (`'noop'`).
 - Types: `JevOptions`, `JevOptionsFor`, `JevOption`, `JevDecision`, `JevClient`, `JevRequest`, `JevResponse`, `JevLogicEvent`, `JevLogicReply`, …
