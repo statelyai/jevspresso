@@ -31,6 +31,12 @@ const LABEL: Record<string, string> = {
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 
+/** What a decision came to: the option chosen, or that Jev chose nothing (unsure, or nothing to choose from). */
+function decisionLabel(d: JevDecision<LightEvent>): string {
+  if (d.option) return LABEL[d.option.id] ?? d.option.id;
+  return d.reason === 'low-confidence' ? 'Unsure, did nothing' : 'Nothing to choose';
+}
+
 /** The bulb: lit and glowing, dark, or cracked with its filament snapped. */
 function Bulb({ lit, broken }: { lit: boolean; broken: boolean }) {
   const on = lit;
@@ -227,7 +233,7 @@ function LightPage() {
             {latest ? (
               <>
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-lg font-semibold">{LABEL[latest.option?.id ?? 'noop'] ?? latest.option?.id}</span>
+                  <span className="text-lg font-semibold">{decisionLabel(latest)}</span>
                   {latest.option ? <span className="tnum text-lg font-semibold text-[#8ee6b4]">{pct(latest.probabilities[latest.option.id] ?? 0)}</span> : null}
                 </div>
                 <ul className="flex flex-col gap-1.5 text-[13px] text-[#a8a49c]">
@@ -264,7 +270,7 @@ function LightPage() {
               {/* Keyed by place from the oldest kept: a row keeps its key as new decisions come in. */}
               {decisions.slice(1, 12).map((d, i) => (
                 <li key={decisions.length - 1 - i} className="flex justify-between gap-2 text-[#cfcbc3]">
-                  <span>{LABEL[d.option?.id ?? 'noop'] ?? d.option?.id}</span>
+                  <span>{decisionLabel(d)}</span>
                   <span className="tnum text-[#6b6862]">{d.option ? pct(d.probabilities[d.option.id] ?? 0) : '—'}</span>
                 </li>
               ))}

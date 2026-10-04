@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { forgetKey, loadKey, saveKey } from '../lib/key';
 
 const REPO = 'https://github.com/statelyai/jevspresso';
@@ -22,9 +22,20 @@ export function useJevKey(serverHasKey: boolean) {
 /** No Jev key on the server or in this browser: run it yourself, or bring your own key. */
 export function NeedsKey({ onKey }: { onKey: (key: string) => void }) {
   const [value, setValue] = useState('');
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (ref.current && !ref.current.open) ref.current.showModal();
+  }, []);
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="needs-key" className="fixed inset-0 z-50 flex items-center justify-center bg-[#141413]/70 p-6 backdrop-blur-sm">
-      <div className="flex w-full max-w-md flex-col gap-5 rounded-2xl border border-[#3a3936] bg-[#1d1d1b] p-6 text-[#faf9f5] shadow-[0_24px_64px_rgba(0,0,0,0.5)]">
+    // A native modal dialog: focus moves into it, and the page behind is inert.
+    // Escape does not close it: there is nothing to do here without a key.
+    <dialog
+      ref={ref}
+      aria-labelledby="needs-key"
+      onCancel={(e) => e.preventDefault()}
+      className="m-auto w-[calc(100%-3rem)] max-w-md rounded-2xl border border-[#3a3936] bg-[#1d1d1b] p-6 text-[#faf9f5] shadow-[0_24px_64px_rgba(0,0,0,0.5)] backdrop:bg-[#141413]/70 backdrop:backdrop-blur-sm"
+    >
+      <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
           <h2 id="needs-key" className="text-lg font-semibold">
             Jev needs a key
@@ -78,6 +89,6 @@ export function NeedsKey({ onKey }: { onKey: (key: string) => void }) {
           </p>
         </form>
       </div>
-    </div>
+    </dialog>
   );
 }
