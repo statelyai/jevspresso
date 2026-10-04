@@ -19,7 +19,7 @@ import type { Bar, BaristaMove, Decision, Device } from '../lib/types';
 import { allHands, cupToken, drinkTag, handsView, type HandsView, type ViewBar } from '../lib/view';
 import { jevAvailable } from '../lib/jev';
 import { downloadLog, jevLog } from '../lib/jevLog';
-import { forgetKey, loadKey, saveKey } from '../lib/key';
+import { forgetKey, loadKey, saveKey, type UserKey } from '../lib/key';
 import { barMachine, type BaristaAgent } from '../machines';
 import { PACE_SETTLE, toBarDecision, type JevPace } from '../lib/barista';
 
@@ -35,7 +35,7 @@ const REPO = 'https://github.com/statelyai/jevspresso';
 function Page() {
   const serverHasKey = Route.useLoaderData();
   // Your own key, read from this browser once the page is in it (`undefined` until then).
-  const [key, setKey] = useState<string | null | undefined>(undefined);
+  const [key, setKey] = useState<UserKey | null | undefined>(undefined);
   useEffect(() => setKey(loadKey()), []);
   return (
     <>
@@ -46,8 +46,9 @@ function Page() {
 }
 
 /** No Jev key on the server or in this browser: run it yourself, or bring your own key. */
-function NeedsKey({ onKey }: { onKey: (key: string) => void }) {
+function NeedsKey({ onKey }: { onKey: (key: { key: string; provider: 'typesafe' | 'openrouter' }) => void }) {
   const [value, setValue] = useState('');
+  const [provider, setProvider] = useState<'typesafe' | 'openrouter'>('openrouter');
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="needs-key" className="fixed inset-0 z-50 flex items-center justify-center bg-[#141413]/70 p-6 backdrop-blur-sm">
       <div className="flex w-full max-w-md flex-col gap-5 rounded-2xl border border-[#3a3936] bg-[#1d1d1b] p-6 text-[#faf9f5] shadow-[0_24px_64px_rgba(0,0,0,0.5)]">
@@ -57,7 +58,7 @@ function NeedsKey({ onKey }: { onKey: (key: string) => void }) {
           </h2>
           <p className="text-[14px] text-[#a8a49c]">
             Jev makes every move behind this bar, and asks a model each time. Run Jevspresso yourself with your own key, or use
-            your TypeSafe key here.
+            a TypeSafe or OpenRouter key here.
           </p>
         </div>
         <a
@@ -73,13 +74,22 @@ function NeedsKey({ onKey }: { onKey: (key: string) => void }) {
           className="flex flex-col gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (value.trim()) onKey(value.trim());
+            if (value.trim()) onKey({ key: value.trim(), provider });
           }}
         >
           <label htmlFor="jev-key" className="text-[13px] text-[#a8a49c]">
             Or use your own key
           </label>
           <div className="flex min-w-0 gap-2">
+            <select
+              aria-label="Key provider"
+              value={provider}
+              onChange={(e) => setProvider(e.target.value as 'typesafe' | 'openrouter')}
+              className="h-11 rounded-lg border border-[#3a3936] bg-[#141413] px-2 text-sm text-[#faf9f5]"
+            >
+              <option value="openrouter">OpenRouter</option>
+              <option value="typesafe">TypeSafe</option>
+            </select>
             <input
               id="jev-key"
               type="password"
@@ -87,7 +97,7 @@ function NeedsKey({ onKey }: { onKey: (key: string) => void }) {
               spellCheck={false}
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              placeholder="Your TypeSafe key"
+              placeholder={`Your ${provider === 'openrouter' ? 'OpenRouter' : 'TypeSafe'} key`}
               className="h-11 min-w-0 grow rounded-lg border border-[#3a3936] bg-[#141413] px-3.5 text-[15px] text-[#faf9f5]"
             />
             <button

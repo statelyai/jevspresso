@@ -11,34 +11,54 @@ import { TypeSafeClient } from '@typesafe-ai/sdk';
 import type { JevClient, JevRequest, JevResponse } from '@xstate/jev';
 import { baristaQuestions } from './barista';
 import { answersToParsedOrder, buildParseQuestions, type Answers } from './jev-core';
-import { userKey } from './key';
+import { userKey, type UserKey } from './key';
 import { logged } from './jevLog';
 import type { BarSnapshot, ParsedOrder } from './types';
 
 /** Is Jev configured? The page checks before opening the bar. */
-export const jevAvailable = createServerFn({ method: 'GET' }).handler(async () => Boolean(process.env.TYPESAFE_API_KEY));
+export const jevAvailable = createServerFn({ method: 'GET' }).handler(async () =>
+  Boolean(process.env.TYPESAFE_API_KEY || process.env.OPENROUTER_API_KEY),
+);
 
 let envClient: TypeSafeClient | null = null;
 
-/** The server's own key if it has one; otherwise the key that came with the request, for this call only. */
-function clientFor(apiKey: string | undefined): TypeSafeClient {
-  if (process.env.TYPESAFE_API_KEY) return (envClient ??= new TypeSafeClient({ timeout: 30_000 }));
-  if (!apiKey) throw new Error('No Jev key: set TYPESAFE_API_KEY, or give one on the page.');
-  return new TypeSafeClient({ apiKey, timeout: 30_000 });
+/** Send Jev's native decision request through OpenRouter. */
+export async function askOpenRouter(state: unknown, questions: Record<string, unknown>, apiKey = process.env.OPENROUTER_API_KEY): Promise<Answers> {
+  const response = await fetch('https://openrouter.ai/api/alpha/decisions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'X-Title': 'Jevspresso',
+    },
+    body: JSON.stringify({ model: process.env.JEV_MODEL || '~typesafe/jev-latest', state, questions }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const payload = (await response.json()) as { answers?: Answers; error?: { message?: string } };
+  if (!response.ok) throw new Error(payload.error?.message || `OpenRouter returned ${response.status}`);
+  if (!payload.answers) throw new Error('OpenRouter returned no Jev answers');
+  return payload.answers;
 }
 
-async function ask(apiKey: string | undefined, state: unknown, questions: Record<string, unknown>): Promise<Answers> {
+/** The server's TypeSafe key takes precedence; OpenRouter is an optional server-side fallback. */
+async function ask(apiKey: UserKey | undefined, state: unknown, questions: Record<string, unknown>): Promise<Answers> {
+  if (!process.env.TYPESAFE_API_KEY && (process.env.OPENROUTER_API_KEY || apiKey?.provider === 'openrouter')) {
+    return askOpenRouter(state, questions, process.env.OPENROUTER_API_KEY || apiKey?.key);
+  }
+  const client = process.env.TYPESAFE_API_KEY
+    ? (envClient ??= new TypeSafeClient({ timeout: 30_000 }))
+    : apiKey?.provider === 'typesafe'
+      ? new TypeSafeClient({ apiKey: apiKey.key, timeout: 30_000 })
+      : null;
+  if (!client) throw new Error('No Jev key: set TYPESAFE_API_KEY or OPENROUTER_API_KEY, or give one on the page.');
   // The SDK's question types are structurally identical to what we build here;
   // the cast keeps the dynamic (per-request) criteria maps out of the generics.
-  const result = await clientFor(apiKey).systemOne({
-    state: state as never,
-    questions: questions as never,
-  });
+  const result = await client.systemOne({ state: state as never, questions: questions as never });
   return result.answers as unknown as Answers;
 }
 
 const parseOrderFn = createServerFn({ method: 'POST' })
-  .validator((input: { text: string; apiKey?: string }) => input)
+  .validator((input: { text: string; apiKey?: UserKey }) => input)
   .handler(async ({ data: { text, apiKey } }): Promise<ParsedOrder> => {
     const started = Date.now();
     const answers = await ask(
@@ -58,7 +78,7 @@ export function parseOrder(text: string): Promise<ParsedOrder> {
 type AgentKind = 'barista' | 'router';
 
 const askJev = createServerFn({ method: 'POST' })
-  .validator((input: { request: JevRequest; apiKey?: string }) => input)
+  .validator((input: { request: JevRequest; apiKey?: UserKey }) => input)
   .handler(async ({ data: { request, apiKey } }): Promise<JevResponse> => {
     return { answers: (await ask(apiKey, request.state, request.questions)) as JevResponse['answers'] };
   });

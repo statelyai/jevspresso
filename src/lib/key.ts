@@ -3,29 +3,31 @@
  * this browser only (localStorage), and sent along with each Jev request, which
  * uses it for that one call and keeps nothing (see `lib/jev.ts`).
  */
-const STORAGE = 'jevspresso:typesafe-key';
+const STORAGE = 'jevspresso:key';
 
-let current: string | null = null;
+export type UserKey = { key: string; provider: 'typesafe' | 'openrouter' };
+let current: UserKey | null = null;
 
 /** The key in use, if you gave one. */
-export function userKey(): string | null {
+export function userKey(): UserKey | null {
   return current;
 }
 
 /** Read it back from this browser, if it was saved here. */
-export function loadKey(): string | null {
+export function loadKey(): UserKey | null {
   try {
-    current = localStorage.getItem(STORAGE);
+    const saved = localStorage.getItem(STORAGE);
+    current = saved ? JSON.parse(saved) : null;
   } catch {
     current = null;
   }
   return current;
 }
 
-export function saveKey(key: string): void {
+export function saveKey(key: UserKey): void {
   current = key;
   try {
-    localStorage.setItem(STORAGE, key);
+    localStorage.setItem(STORAGE, JSON.stringify(key));
   } catch {
     // Storage blocked: the key still works until the page closes.
   }
