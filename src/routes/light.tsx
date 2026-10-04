@@ -4,13 +4,14 @@ import { useState } from 'react';
 import type { JevAgentContext, JevDecision } from '@xstate/jev';
 import type { AnyActorRef } from 'xstate';
 import { JevMark } from '../components/JevMark';
+import { ForgetKeyIcon } from '../components/Header';
 import { NeedsKey, useJevKey } from '../components/NeedsKey';
 import { jevAvailable, jevClient } from '../lib/jev';
 import { createLightMachine, isLit, type LampValue, type LightEvent } from '../machines/light';
 
 /**
- * jev's "Hello World", live: a lamp, your requests, and a bulb you can break.
- * The machine is in `src/machines/light.ts`; jev is invoked at its top.
+ * Jev's "Hello World", live: a lamp, your requests, and a bulb you can break.
+ * The machine is in `src/machines/light.ts`; Jev is invoked at its top.
  */
 export const Route = createFileRoute('/light')({
   loader: () => jevAvailable(),
@@ -119,8 +120,22 @@ function LightPage() {
         <h1 className="text-xl font-semibold tracking-[-0.01em]">
           Jevspresso <span className="text-[#6b6862]">/ light</span>
         </h1>
-        <span className="hidden text-[13px] text-[#a8a49c] sm:inline">jev’s Hello World: a lamp, your requests, and a bulb that breaks</span>
-        <Link to="/" className="ml-auto rounded-lg border border-[#3a3936] px-3.5 py-2 text-[13px] text-[#cfcbc3] hover:border-[#6b6862]">
+        <span className="hidden text-[13px] text-[#a8a49c] sm:inline">Jev’s Hello World: a lamp, your requests, and a bulb that breaks</span>
+        {key.forget ? (
+          <button
+            type="button"
+            onClick={key.forget}
+            aria-label="Forget key"
+            title="Remove your Jev key from this browser"
+            className="ml-auto flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border border-[#3a3936] text-[#cfcbc3] hover:border-[#6b6862]"
+          >
+            <ForgetKeyIcon />
+          </button>
+        ) : null}
+        <Link
+          to="/"
+          className={`${key.forget ? '' : 'ml-auto '}rounded-lg border border-[#3a3936] px-3.5 py-2 text-[13px] text-[#cfcbc3] hover:border-[#6b6862]`}
+        >
           Espresso bar →
         </Link>
       </header>
@@ -184,9 +199,9 @@ function LightPage() {
           </div>
 
           <ol aria-label="Requests" className="flex w-full max-w-md flex-col gap-1.5 text-[13px]">
-            {requests.length === 0 ? <li className="text-center text-[#6b6862]">No requests yet: jev has nothing to do.</li> : null}
+            {requests.length === 0 ? <li className="text-center text-[#6b6862]">No requests yet: Jev has nothing to do.</li> : null}
             {requests.map((r, i) => (
-              <li key={r.at} className={`flex justify-between gap-3 ${i === 0 ? 'text-[#faf9f5]' : 'text-[#6b6862]'}`}>
+              <li key={r.id} className={`flex justify-between gap-3 ${i === 0 ? 'text-[#faf9f5]' : 'text-[#6b6862]'}`}>
                 <span className="min-w-0 truncate">“{r.text}”</span>
                 {i === 0 ? <span className="shrink-0 text-[#a8a49c]">latest</span> : null}
               </li>
@@ -194,7 +209,7 @@ function LightPage() {
           </ol>
         </section>
 
-        <aside aria-label="jev" className="flex min-w-0 flex-col gap-4">
+        <aside aria-label="Jev" className="flex min-w-0 flex-col gap-4">
           <div className="flex flex-col gap-3 rounded-xl border border-[#2a2a28] bg-[#1d1d1b] p-4">
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2 text-[13px] text-[#a8a49c]">
@@ -234,7 +249,7 @@ function LightPage() {
                     ))}
                 </ul>
                 <p className="text-xs text-[#6b6862]">
-                  Its options were only what the lamp accepts right now.
+                  Its options were only what the lamp accepted when it chose{agent?.value === 'deciding' ? ': it is looking again' : ''}.
                 </p>
               </>
             ) : (
@@ -246,8 +261,9 @@ function LightPage() {
           <section aria-label="History" className="flex flex-col gap-2 text-[13px]">
             <h2 className="text-[13px] text-[#a8a49c]">History</h2>
             <ol className="flex flex-col gap-1">
-              {decisions.slice(1, 12).map((d) => (
-                <li key={d.at} className="flex justify-between gap-2 text-[#cfcbc3]">
+              {/* Keyed by place from the oldest kept: a row keeps its key as new decisions come in. */}
+              {decisions.slice(1, 12).map((d, i) => (
+                <li key={decisions.length - 1 - i} className="flex justify-between gap-2 text-[#cfcbc3]">
                   <span>{LABEL[d.option?.id ?? 'noop'] ?? d.option?.id}</span>
                   <span className="tnum text-[#6b6862]">{d.option ? pct(d.probabilities[d.option.id] ?? 0) : '—'}</span>
                 </li>
@@ -258,7 +274,7 @@ function LightPage() {
 
           <section aria-label="How it works" className="rounded-xl border border-[#2a2a28] p-4 text-[13px] leading-relaxed text-[#a8a49c]">
             <h2 className="mb-1.5 text-[#faf9f5]">How it works</h2>
-            Your request goes into the lamp’s context. jev, invoked at the top of the lamp’s machine, sees it change and picks
+            Your request goes into the lamp’s context. Jev, invoked at the top of the lamp’s machine, sees it change and picks
             from what the lamp accepts right now: flip the switch, replace a broken bulb, or wait. It is never told how a lamp
             works: each option says what it comes to, down to whether the room is lit.
           </section>

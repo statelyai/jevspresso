@@ -3,19 +3,19 @@ import { setup, types } from 'xstate';
 import { z } from 'zod';
 
 /**
- * jev's "Hello World": a lamp, and a person asking for things. A request is
- * only context (`requests`); jev, invoked at the top, sees it change and does
+ * Jev's "Hello World": a lamp, and a person asking for things. A request is
+ * only context (`requests`); Jev, invoked at the top, sees it change and does
  * what the lamp allows to satisfy it.
  *
  * The lamp is two things, as a real one is: its switch (on or off) and its
  * bulb (ok or broken). The room is lit when the switch is on and the bulb is
  * ok. The bulb can break (you break it); a switch left on stays on, so a new
- * bulb lights the room again. jev is not told any of this: it reads it off
+ * bulb lights the room again. Jev is not told any of this: it reads it off
  * what each move comes to.
  */
 export interface LightContext {
-  /** What has been asked for, oldest first. */
-  requests: Array<{ text: string; at: number }>;
+  /** What has been asked for, oldest first, each numbered in turn. */
+  requests: Array<{ id: number; text: string; at: number }>;
 }
 
 export type LightEvent =
@@ -33,7 +33,7 @@ export function isLit(value: LampValue): boolean {
   return value.switch === 'on' && value.bulb === 'ok';
 }
 
-/** What jev is told: the goal, what waiting means, and what it sees. Everything else comes from the machine. */
+/** What Jev is told: the goal, what waiting means, and what it sees. Everything else comes from the machine. */
 export const lightJev: Omit<JevOptions<LightEvent, LightContext>, 'client'> = {
   events: 'lamp.*',
   instructions: 'Do what the latest of the `requests` asks, if the room is not like that already; otherwise wait.',
@@ -56,19 +56,21 @@ export function createLightMachine(client: JevClient) {
       events: {
         'user.request': types<{ text: string; at: number }>(),
         BREAK: types<void>(),
-        // jev's moves: runtime schemas, and what each does.
+        // Jev's moves: runtime schemas, and what each does.
         'lamp.switchOn': z.object({}).describe('flip the lamp’s switch on'),
         'lamp.switchOff': z.object({}).describe('flip the lamp’s switch off'),
         'lamp.replaceBulb': z.object({}).describe('screw in a new bulb'),
       },
     },
     context: { requests: [] },
-    // jev decides on the lamp whenever it changes: no states of its own.
+    // Jev decides on the lamp whenever it changes: no states of its own.
     invoke: { src: 'jev', id: 'jev' },
     on: {
-      // A request is just context: jev sees it, and acts on it.
+      // A request is just context: Jev sees it, and acts on it.
       'user.request': ({ context, event }) => ({
-        context: { requests: [...context.requests, { text: event.text, at: event.at }].slice(-20) },
+        context: {
+          requests: [...context.requests, { id: (context.requests.at(-1)?.id ?? 0) + 1, text: event.text, at: event.at }].slice(-20),
+        },
       }),
     },
     type: 'parallel',
