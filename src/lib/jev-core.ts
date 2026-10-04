@@ -45,7 +45,7 @@ export const qId = {
 };
 
 /**
- * One jev call, function-calling-cookbook style: the drink menu becomes a
+ * One Jev call, function-calling-cookbook style: the drink menu becomes a
  * yes/no per drink, and every argument of the "order" call becomes a closed-set
  * question. All of them are answered in parallel over the same state.
  */

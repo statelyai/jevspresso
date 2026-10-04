@@ -1,9 +1,9 @@
 /**
- * What jev is told about the bar: which events it may pick, and what it sees.
+ * What Jev is told about the bar: which events it may pick, and what it sees.
  * The rest comes from the machine: `can()` says what is physically possible,
  * each option reads as its transition's or its event schema's description, and
- * its lookahead is what changes in what jev sees, once the move is done.
- * Whether an action makes the right drink is jev's call.
+ * its lookahead is what changes in what Jev sees, once the move is done.
+ * Whether an action makes the right drink is Jev's call.
  */
 import {
   type JevDecision,
@@ -18,8 +18,8 @@ import type { BarContext, BarEvent, BarSnapshot, Decision, SideAnswer } from './
 export const BACKLOG_LEVELS = ['calm', 'busy', 'slammed'] as const;
 
 /**
- * Extra judgments the barista's jev adapter adds to every request (see
- * `jevClient` in `lib/jev.ts`). They do not take part in the decision: jev
+ * Extra judgments the barista's Jev adapter adds to every request (see
+ * `jevClient` in `lib/jev.ts`). They do not take part in the decision: Jev
  * answers each question on its own. The decision card shows them.
  */
 export function baristaQuestions(bar: BarSnapshot): Record<string, JevQuestion> {
@@ -54,13 +54,13 @@ export const barista: JevOptions<BarEvent, BarContext> = {
   instructions:
     "Goal: serve every open order exactly what it ordered, as fast as you can, the longest-waiting first. With no order open there is nothing to make: wait, or tidy up (knock out a spent puck, put away or pour away cups no order needs); do not start drinks nobody ordered. Which of these actions best moves toward that right now? Each option says what changes, and what it comes to once done: a cup's `onTrackFor` is the order it can still become, and `matches` the order it already is; an order's `next` is what it needs next (a cup, then each ingredient in order), and `blockedBy` what stands in its way. A served cup goes to the order it is exactly; anything else is a wrong drink. A second barista (a person, `otherBarista`) works the same bar with their own hands, and may leave cups no order could become.",
   state: (snapshot) => serializeBar(barOf(snapshot)),
-  // jev is one of two baristas: every move it makes is its own.
+  // Jev is one of two baristas: every move it makes is its own.
   fixed: { by: 'jev' },
   // Only what the schemas cannot say: which ids exist. A `cupId` or `drinkId`
   // is any string, so the cups on the bar and the orders are listed; every enum
   // (`spot`, `milk`, `device`, `ingredient`) is enumerated from the
   // schemas, and `can()` decides what is possible. Nothing is left out as
-  // unwise: that is jev's call.
+  // unwise: that is Jev's call.
   payloads: ({ context }) => {
     const cups = context.cups.map((c) => ({ cupId: c.id }));
     const orders = context.drinks.map((d) => ({ drinkId: d.id }));
@@ -94,22 +94,22 @@ export const baristaLoops: JevLoopSettings = { repeats: 3, window: 20, idleStrea
 const PACE_MS = 700;
 
 /**
- * The fail-safe for an idle loop (jev keeps being asked, keeps choosing to do
+ * The fail-safe for an idle loop (Jev keeps being asked, keeps choosing to do
  * nothing): the pause stretches this many times, so the barista stops paying
- * for requests that change nothing until jev acts again.
+ * for requests that change nothing until Jev acts again.
  */
 const IDLE_BACKOFF = 8;
 
-/** How long after a decision jev decides again: a pause, at the bar's speed, stretched while it keeps waiting. */
+/** How long after a decision Jev decides again: a pause, at the bar's speed, stretched while it keeps waiting. */
 export function baristaInterval({ loop, snapshot }: { loop: JevLoop | null; snapshot: { context: BarContext } }): number {
   return (PACE_MS * (loop?.kind === 'idle' ? IDLE_BACKOFF : 1)) / (snapshot.context.speed || 1);
 }
 
-/** How fast jev plays: 1 is as fast as the bar allows; ½ leaves a person a window after every change to step in. */
+/** How fast Jev plays: 1 is as fast as the bar allows; ½ leaves a person a window after every change to step in. */
 export type JevPace = 1 | 0.5;
 
 /**
- * At a slower pace, how long the bar must stay unchanged before jev decides
+ * At a slower pace, how long the bar must stay unchanged before Jev decides
  * (the agent's `settle`), in real time: the bar's speed does not shorten it,
  * since it is for a person to step in.
  */
@@ -135,7 +135,7 @@ function asChoice(d: JevDecision<BarEvent>, id: string) {
   return a?.type === 'choice' ? a : undefined;
 }
 
-/** A jev decision plus the adapter's extra answers, as the decision log keeps it. */
+/** A Jev decision plus the adapter's extra answers, as the decision log keeps it. */
 export function toBarDecision(d: JevDecision<BarEvent>): Decision {
   const alsoAnswers: SideAnswer[] = [];
   const target = asChoice(d, 'target_drink');

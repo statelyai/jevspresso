@@ -1,5 +1,5 @@
 /**
- * Every request the page's jev clients sent, and what came back: the latest
+ * Every request the page's Jev clients sent, and what came back: the latest
  * ones, kept in memory for a download (see `logClient` in `@xstate/jev`).
  * Your key is never part of a request.
  */

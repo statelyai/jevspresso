@@ -191,7 +191,7 @@ export function machineMap(snapshot: JevSnapshot): string {
     }
     for (const def of node.after) {
       const name = typeof def.delay === 'string' ? `${def.delay} ` : '';
-      // An `after` matches its own timer event; that pattern is no news to jev.
+      // An `after` matches its own timer event; that pattern is no news to Jev.
       lines.push(`${pad}    ${transitionLine(node, `after ${name}(${(ms(node, def.delay) / 1000).toFixed(1)}s)`, { ...def, matches: undefined })}`);
     }
     for (const def of node.always ?? []) lines.push(`${pad}    ${transitionLine(node, 'always', def)}`);

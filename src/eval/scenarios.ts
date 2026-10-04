@@ -1,7 +1,7 @@
 /**
- * Scenarios to measure the barista's jev against, run without the page: the
- * bar on a simulated clock, jev deciding every move (`decide`), and time
- * jumping to the moment jev could act again. Every run reports whether the
+ * Scenarios to measure the barista's Jev against, run without the page: the
+ * bar on a simulated clock, Jev deciding every move (`decide`), and time
+ * jumping to the moment Jev could act again. Every run reports whether the
  * orders came out right, and what it cost on the way.
  */
 import { decide, detectLoop, tellLoop, type JevClient, type JevDecision, type JevLoop, type JevOptions } from '@xstate/jev';
@@ -22,8 +22,8 @@ export interface Scenario {
   bar?: Partial<BarContext>;
   /**
    * Sabotage: what happens to the bar from outside (a machine breaking, you
-   * working against jev), once, the first time `when` holds before one of
-   * jev's decisions. A move of yours waits until the bar takes it.
+   * working against Jev), once, the first time `when` holds before one of
+   * Jev's decisions. A move of yours waits until the bar takes it.
    */
   meanwhile?: Array<{ when: (bar: Bar) => boolean; event: BarEvent }>;
 }
@@ -66,7 +66,7 @@ export const SCENARIOS: Scenario[] = [
     orders: [{ drink: 'latte', milk: 'oat' }],
     bar: { inventory: { ...INITIAL_INVENTORY, milk: { ...INITIAL_INVENTORY.milk, oat: 100 } } },
   },
-  // Sabotage: you, or the bar itself, working against jev mid-drink.
+  // Sabotage: you, or the bar itself, working against Jev mid-drink.
   {
     id: 'sabotage-shot',
     label: 'A latte; the group head breaks while the shot pulls',
@@ -120,14 +120,14 @@ export interface RunResult {
   dumped: number;
   /** Loops seen along the way (`detectLoop`, with the barista's settings). */
   loops: JevLoop['kind'][];
-  /** jev chose to wait with nothing running: nothing would ever change. */
+  /** Jev chose to wait with nothing running: nothing would ever change. */
   stalled: boolean;
   /** Bar time it took, in seconds. */
   seconds: number;
-  /** jev requests made, and their size in characters of JSON (about 4 a token). */
+  /** Jev requests made, and their size in characters of JSON (about 4 a token). */
   requests: number;
   chars: number;
-  /** jev's moves, in order, with the sabotage where it struck (`!` before it). */
+  /** Jev's moves, in order, with the sabotage where it struck (`!` before it). */
   moves: string[];
   error?: string;
 }
@@ -144,9 +144,9 @@ function dueTimes(actor: { system: { getSnapshot: () => { _scheduledTimers: Reco
 export interface RunOptions {
   maxDecisions?: number;
   /**
-   * - `paused` (default): the bar waits while jev thinks, as if jev were instant.
-   * - `live`: as on the page, the bar runs on while jev thinks, for as long as
-   *   jev takes to answer, at `speed`; a move the bar has outgrown by then is
+   * - `paused` (default): the bar waits while Jev thinks, as if Jev were instant.
+   * - `live`: as on the page, the bar runs on while Jev thinks, for as long as
+   *   Jev takes to answer, at `speed`; a move the bar has outgrown by then is
    *   not taken.
    */
   clock?: 'paused' | 'live';
@@ -158,7 +158,7 @@ export interface RunOptions {
 
 /**
  * Run one scenario to the end: until every order is done, nothing more can
- * happen, or `maxDecisions`. jev is told about its own loops, as on the page
+ * happen, or `maxDecisions`. Jev is told about its own loops, as on the page
  * (`tellLoop`).
  */
 export async function runScenario(scenario: Scenario, client: JevClient, options: RunOptions = {}): Promise<RunResult> {
@@ -200,7 +200,7 @@ export async function runScenario(scenario: Scenario, client: JevClient, options
         history.length ? detectLoop(history, baristaLoops) : null,
       );
       const decision = await decide(snapshot, { ...told, client });
-      // Live, the bar ran on while jev was thinking: the move may no longer be possible.
+      // Live, the bar ran on while Jev was thinking: the move may no longer be possible.
       if (mode === 'live') clock.increment(Date.now() - asked);
       if (decision.size) (requests++, (chars += decision.size.total));
       const sent = !!decision.event && actor.getSnapshot().can(decision.event);
@@ -209,12 +209,12 @@ export async function runScenario(scenario: Scenario, client: JevClient, options
       history.unshift({ ...decision, sent });
       const loop = detectLoop(history, baristaLoops);
       if (loop) loops.add(loop.kind);
-      // Time passes: a move until jev's hands are free; a wait until the next thing running is done
-      // (nothing running, and nothing changed since jev looked: stalled).
+      // Time passes: a move until Jev's hands are free; a wait until the next thing running is done
+      // (nothing running, and nothing changed since Jev looked: stalled).
       if (sent) {
         while (actor.getSnapshot().context.hands.jev && next());
       } else if (actor.getSnapshot() !== snapshot) {
-        // Live, the bar moved on while jev was deciding to wait: ask again about the bar as it is now.
+        // Live, the bar moved on while Jev was deciding to wait: ask again about the bar as it is now.
         continue;
       } else if (!next()) {
         stalled = true;

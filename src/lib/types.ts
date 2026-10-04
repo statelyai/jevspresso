@@ -1,4 +1,4 @@
-/** Domain types shared by the machine, the jev wrapper and the UI. */
+/** Domain types shared by the machine, the Jev wrapper and the UI. */
 import type { JevDecision, JevOption } from '@xstate/jev';
 
 
@@ -192,7 +192,7 @@ export interface ParsedOrderItem {
 
 export type Intent = 'order' | 'cancel' | 'question' | 'other';
 
-/** Answer shapes as they come back from jev (mirrors the SDK response types). */
+/** Answer shapes as they come back from Jev (mirrors the SDK response types). */
 export interface NoulAnswer {
   type: 'noul';
   noul: number;
@@ -218,14 +218,14 @@ export interface ParsedOrder {
   intent: Intent;
   confidence: number;
   latencyMs: number;
-  /** Raw jev answers, kept for the decision log. */
+  /** Raw Jev answers, kept for the decision log. */
   raw: Answers;
 }
 
-/** A barista action jev may choose: a fully-instantiated event, or the noop. */
+/** A barista action Jev may choose: a fully-instantiated event, or the noop. */
 export type BaristaOption = JevOption<BarEvent>;
 
-/** A sibling question jev answered alongside the action, shown for display only. */
+/** A sibling question Jev answered alongside the action, shown for display only. */
 export interface SideAnswer {
   id: string;
   label: string;
@@ -233,9 +233,9 @@ export interface SideAnswer {
   probabilities: Record<string, number>;
 }
 
-/** One barista decision as logged: jev's decision plus the display-only siblings. */
+/** One barista decision as logged: Jev's decision plus the display-only siblings. */
 export interface Decision extends JevDecision<BarEvent> {
-  /** Parallel answers jev gave for display; never used for control. */
+  /** Parallel answers Jev gave for display; never used for control. */
   also: SideAnswer[];
   extras: {
     backlogPressure: number;
@@ -256,7 +256,7 @@ export interface CupView {
   busy: boolean;
 }
 
-/** Everything jev sees when deciding the next barista action. */
+/** Everything Jev sees when deciding the next barista action. */
 export interface BarSnapshot {
   /** The open orders, longest waiting first. */
   queue: Array<{
@@ -278,7 +278,7 @@ export interface BarSnapshot {
   activeSteps: Array<{ stepId: string; cupId?: string; resource?: Device }>;
   equipment: Record<Device, DeviceStatus>;
   inventory: Inventory;
-  /** What jev's own hands are on. */
+  /** What Jev's own hands are on. */
   yourHands: string | null;
   /** What the other barista (a person) has their hands on. */
   otherBarista: string | null;
@@ -288,7 +288,7 @@ export interface BarSnapshot {
 }
 
 /**
- * The two baristas at the bar: jev, and you. Each has their own hands; the
+ * The two baristas at the bar: Jev, and you. Each has their own hands; the
  * equipment, the portafilter, the pitcher and the cups are shared.
  */
 export type Barista = 'jev' | 'you';
@@ -339,7 +339,7 @@ export type BarEvent =
   | { type: 'SET_BREAK_PROB'; device: Device; prob: number }
   | { type: 'RESET' };
 
-/** A barista action: the events jev may choose for the bar. */
+/** A barista action: the events Jev may choose for the bar. */
 export type BaristaAction = Extract<BarEvent, { type: `barista.${string}` }>['type'];
 
 /**

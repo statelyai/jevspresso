@@ -56,7 +56,7 @@ export const DEVICE_NOUN: Record<Device, string> = {
 };
 
 export interface HandsView {
-  /** Whose hands: jev's, or yours. */
+  /** Whose hands: Jev's, or yours. */
   who: Barista;
   /** The action the hands are on. */
   doing: BaristaAction;
@@ -97,7 +97,7 @@ export function handsView(ctx: ViewBar, who: Barista): HandsView | null {
   return { ...base, part, label, cupId, drink: ctx.drinks.find((d) => d.id === forOrder) };
 }
 
-/** Both baristas' hands that are busy: jev's first. */
+/** Both baristas' hands that are busy: Jev's first. */
 export function allHands(ctx: ViewBar): HandsView[] {
   return (['jev', 'you'] as const).flatMap((who) => handsView(ctx, who) ?? []);
 }
@@ -324,7 +324,7 @@ function cupNext(ctx: Bar, cup: Cup, assigned: Map<string, string>): BaristaMove
 }
 
 /**
- * Everything physically possible at a spot, as clicks: the same events jev picks
+ * Everything physically possible at a spot, as clicks: the same events Jev picks
  * from, checked the same way (`can`). A click does what a cup there needs next
  * for its order (see `cupNext`), else the first possible; the rest are offered
  * beside it. Milk is steamed for the `selected` order first.

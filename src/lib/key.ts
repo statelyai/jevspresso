@@ -1,6 +1,6 @@
 /**
- * A jev key you paste in, when the server has none of its own. It is kept in
- * this browser only (localStorage), and sent along with each jev request, which
+ * A Jev key you paste in, when the server has none of its own. It is kept in
+ * this browser only (localStorage), and sent along with each Jev request, which
  * uses it for that one call and keeps nothing (see `lib/jev.ts`).
  */
 const STORAGE = 'jevspresso:typesafe-key';

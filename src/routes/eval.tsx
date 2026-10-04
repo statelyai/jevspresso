@@ -8,10 +8,10 @@ import { downloadLog } from '../lib/jevLog';
 import { loadKey } from '../lib/key';
 
 /**
- * The scenarios (`src/eval/scenarios.ts`), run with real jev, with your key if
+ * The scenarios (`src/eval/scenarios.ts`), run with real Jev, with your key if
  * you gave one on the bar's page: each scenario several times, as shipped and
- * with parts of what jev is shown taken out (`src/eval/ablations.ts`), on a
- * clock that waits for jev or runs on while it thinks.
+ * with parts of what Jev is shown taken out (`src/eval/ablations.ts`), on a
+ * clock that waits for Jev or runs on while it thinks.
  */
 export const Route = createFileRoute('/eval')({ component: Eval });
 
@@ -22,7 +22,7 @@ const mean = (xs: number[]) => (xs.length ? Math.round((xs.reduce((a, b) => a + 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
 function Eval() {
-  // One run each by default: jev answers alike from run to run, and every run costs requests.
+  // One run each by default: Jev answers alike from run to run, and every run costs requests.
   const [times, setTimes] = useState(1);
   const [clock, setClock] = useState<'paused' | 'live'>('paused');
   const [chosen, setChosen] = useState<Set<string>>(() => new Set(['all']));
@@ -88,8 +88,8 @@ function Eval() {
               onChange={(e) => setClock(e.target.value as 'paused' | 'live')}
               className="rounded border border-[#3d3d3a] bg-[#1f1e1d] px-2 py-1 text-[#faf9f5]"
             >
-              <option value="paused">waits for jev</option>
-              <option value="live">runs on while jev thinks (10×)</option>
+              <option value="paused">waits for Jev</option>
+              <option value="live">runs on while Jev thinks (10×)</option>
             </select>
           </label>
           <label className="flex items-center gap-2 text-sm text-[#a8a49c]">
@@ -155,7 +155,7 @@ function Eval() {
           <table className="w-full text-left text-sm">
             <thead className="text-[#a8a49c]">
               <tr>
-                <th className="py-2 pr-3 font-normal">What jev is shown</th>
+                <th className="py-2 pr-3 font-normal">What Jev is shown</th>
                 <th className="pr-3 font-normal">Right</th>
                 {SCENARIOS.map((s) => (
                   <th key={s.id} className="pr-2 font-normal" title={s.label}>
@@ -233,7 +233,7 @@ function Eval() {
         ) : null}
         <p className="text-xs text-[#6b6862]">
           Right: runs where every order was served exactly right. Moves and bar time are averages; the rest are totals over all runs. Loops:
-          runs where jev looped (it is told, as on the page). Click a cell for each run's moves; a sabotage shows as !.
+          runs where Jev looped (it is told, as on the page). Click a cell for each run's moves; a sabotage shows as !.
         </p>
       </div>
     </main>

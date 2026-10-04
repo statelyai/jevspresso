@@ -1,6 +1,6 @@
 import type { JevClient, JevRequest, JevResponse } from './types';
 
-/** One request to jev, as `logClient` saw it: what went out, what came back (or the error), and how long it took. */
+/** One request to Jev, as `logClient` saw it: what went out, what came back (or the error), and how long it took. */
 export interface JevLogEntry {
   at: number;
   request: JevRequest;

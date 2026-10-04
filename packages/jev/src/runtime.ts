@@ -7,7 +7,7 @@ import type { JevDecideOptions, JevDecision, JevOptions, JevSnapshot } from './t
 export interface JevLogicOptions<TEvent extends EventObject, TContext extends MachineContext>
   extends JevDecideOptions<TEvent, TContext> {
   /**
-   * Where the chosen event goes, if the watched actor still accepts it when jev answers:
+   * Where the chosen event goes, if the watched actor still accepts it when Jev answers:
    * - `'parent'` (default): to the agent's parent, which acts on it. Invoked
    *   at the top of the machine it decides for, that is the machine itself.
    * - `'actor'`: to the watched actor directly.
@@ -22,20 +22,20 @@ export interface JevLogicOptions<TEvent extends EventObject, TContext extends Ma
   /**
    * How long to hold off after a decision before the next, in ms (default 0):
    * a number, or from the decision, the loop it is in, and the snapshot it was
-   * made on (to slow down while jev keeps choosing to wait, say).
+   * made on (to slow down while Jev keeps choosing to wait, say).
    */
   interval?:
     | number
     | ((last: { decision: JevDecision<TEvent>; loop: JevLoop | null; snapshot: JevSnapshot<TContext, TEvent> }) => number);
   /**
-   * How long the watched actor must stay unchanged before jev decides, in ms
+   * How long the watched actor must stay unchanged before Jev decides, in ms
    * (default 0): a window for a person to step in. `jev.settle` changes it.
    */
   settle?: number;
   /** How many decisions the agent keeps in its snapshot, newest first (default 50). */
   keep?: number;
   /**
-   * Reuse the response to an identical request without calling jev (see
+   * Reuse the response to an identical request without calling Jev (see
    * `memoizeClient`). On by default; `false` turns it off.
    */
   cache?: false | MemoizeOptions;
@@ -48,7 +48,7 @@ export interface JevLogicOptions<TEvent extends EventObject, TContext extends Ma
     | false
     | (JevLoopSettings & {
         onLoop?: (loop: JevLoop) => void;
-        /** Tell jev it is going in circles, in what it sees, so it can break the cycle. Default true. */
+        /** Tell Jev it is going in circles, in what it sees, so it can break the cycle. Default true. */
         tell?: boolean;
       });
 }
@@ -78,16 +78,16 @@ export type JevLogicEvent =
   | { type: 'jev.resume' }
   /** Forget everything decided so far: the log, the loop, and what was waited on. */
   | { type: 'jev.reset' }
-  /** How long the watched actor must stay unchanged before jev decides, in ms. */
+  /** How long the watched actor must stay unchanged before Jev decides, in ms. */
   | { type: 'jev.settle'; ms: number };
 
 /** Events the agent sends its parent: the chosen event, and the answer to a `jev.ask`. */
 export type JevLogicReply<TEvent extends EventObject = EventObject> =
-  /** A request to jev went out, for a `jev.ask`. */
+  /** A request to Jev went out, for a `jev.ask`. */
   | { type: 'jev.thinking' }
   /** The chosen event itself, with `deliver: 'parent'`. */
   | TEvent
-  /** jev answered a `jev.ask`; `decision.sent` says whether the chosen event was delivered. */
+  /** Jev answered a `jev.ask`; `decision.sent` says whether the chosen event was delivered. */
   | { type: 'jev.decided'; decision: JevDecision<TEvent>; loop: JevLoop | null }
   | { type: 'jev.failed'; error: string };
 
@@ -126,11 +126,11 @@ const warnLoop = (loop: JevLoop) => console.warn(`[@xstate/jev] possible loop: $
 
 /**
  * While the agent is going in circles, or sending the same run of moves lap
- * after lap, jev is told so, in what it sees: the moves that keep bringing
+ * after lap, Jev is told so, in what it sees: the moves that keep bringing
  * the actor back, or that keep repeating. The request differs from the ones
- * that looped, so it is not answered from the cache, and jev can choose
+ * that looped, so it is not answered from the cache, and Jev can choose
  * differently. The note names each move once, so it stays the same lap after
- * lap: if jev loops anyway, the cache takes over again. `createJevLogic` does
+ * lap: if Jev loops anyway, the cache takes over again. `createJevLogic` does
  * this itself; a driver of its own around `decide()` can do the same.
  */
 export function tellLoop<TEvent extends EventObject, TContext extends MachineContext, O extends JevOptions<TEvent, TContext>>(
@@ -151,7 +151,7 @@ export function tellLoop<TEvent extends EventObject, TContext extends MachineCon
   };
 }
 
-/** Would the actor still accept the decided event? It may have moved on while jev was answering. */
+/** Would the actor still accept the decided event? It may have moved on while Jev was answering. */
 function accepts(actor: AnyActorRef | undefined, decision: JevDecision<EventObject>): boolean {
   if (!decision.event || !actor) return false;
   const snapshot = actor.getSnapshot() as JevSnapshot;
@@ -159,10 +159,10 @@ function accepts(actor: AnyActorRef | undefined, decision: JevDecision<EventObje
 }
 
 /**
- * A jev agent as actor logic: invoke it at the top of the machine it decides
+ * A Jev agent as actor logic: invoke it at the top of the machine it decides
  * for (or spawn it beside one, with `input.actor`), and it decides by itself.
  * The machine needs no states of its own for it: whenever the machine
- * changes and there is a question worth a request, the agent asks jev, and
+ * changes and there is a question worth a request, the agent asks Jev, and
  * sends the chosen event if the machine still accepts it. Its own lifecycle
  * is its snapshot: `watching` (until there is something to decide, and the
  * `interval` and `settle` times have passed), `deciding` (a request on its
@@ -171,7 +171,7 @@ function accepts(actor: AnyActorRef | undefined, decision: JevDecision<EventObje
  *
  * Identical requests are answered from the cache, a request whose answer was
  * to do nothing is not made again until it changes, and loops are detected,
- * reported and told to jev (`tellLoop`). `jev.ask` decides once on request,
+ * reported and told to Jev (`tellLoop`). `jev.ask` decides once on request,
  * with input (a reply to route, say), and answers the parent.
  */
 export function createJevLogic<TEvent extends EventObject, TContext extends MachineContext = any>(
@@ -184,7 +184,7 @@ export function createJevLogic<TEvent extends EventObject, TContext extends Mach
   const deliver = opts.deliver ?? 'parent';
   const auto = opts.auto ?? true;
   const keep = Math.max(opts.keep ?? 50, loops ? (loops.window ?? 20) : 0);
-  /** What jev is asked with: told about a cycle it is in. */
+  /** What Jev is asked with: told about a cycle it is in. */
   const asking = (loop: JevLoop | null) =>
     loops === false || loops?.tell === false ? opts : tellLoop<TEvent, TContext, typeof opts>(opts, loop);
   type Ctx = JevAgentContext<TEvent>;
@@ -225,7 +225,7 @@ export function createJevLogic<TEvent extends EventObject, TContext extends Mach
       decide: createAsyncLogic<Answer, Asked>({
         run: async ({ input }) => {
           // Loops are found on the request as it would be without the note
-          // about them, so telling jev does not hide the very loop it is told about.
+          // about them, so telling Jev does not hide the very loop it is told about.
           const plainKey = input.loop ? requestKey(input.snapshot, opts, input.input) : null;
           const decision = await decide(input.snapshot, asking(input.loop), input.input);
           // Settle on a later task: with an instant client (a cache, a mock), a
@@ -302,7 +302,7 @@ export function createJevLogic<TEvent extends EventObject, TContext extends Mach
         },
       },
       deciding: {
-        description: 'A request to jev on its way',
+        description: 'A request to Jev on its way',
         entry: ({ context, parent }, enq) => {
           if (context.replying && parent) enq.sendTo(parent, { type: 'jev.thinking' });
         },
@@ -361,8 +361,8 @@ export function createJevLogic<TEvent extends EventObject, TContext extends Mach
 
 /**
  * The loop the latest decisions are in, newest first. The newest is looked
- * up by `plainKey` when jev was told about a loop (its own key carries the
- * note), so telling jev does not hide the loop.
+ * up by `plainKey` when Jev was told about a loop (its own key carries the
+ * note), so telling Jev does not hide the loop.
  */
 function findLoop<TEvent extends EventObject>(
   decisions: JevDecision<TEvent>[],

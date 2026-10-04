@@ -42,14 +42,14 @@ export interface JevRequest {
 }
 export interface JevResponse {
   answers: Record<string, JevAnswer>;
-  /** Set by clients that answered without calling jev. */
+  /** Set by clients that answered without calling Jev. */
   mock?: boolean;
   /** Set by `memoizeClient` when an identical earlier request's response was reused. */
   cached?: boolean;
 }
 
 /**
- * How requests reach jev. Keeps the API key wherever the caller keeps it: pass
+ * How requests reach Jev. Keeps the API key wherever the caller keeps it: pass
  * `(req) => typesafe.systemOne(req)` on a server, or a fetch to your own
  * endpoint in a browser.
  */
@@ -85,16 +85,16 @@ export type EventPayload<TEvent extends EventObject, TType extends string> = TEv
 export type JevStrategy = 'flat' | 'hierarchical' | 'auto';
 
 /**
- * What jev decides and how it is asked. Every event jev may choose must be
+ * What Jev decides and how it is asked. Every event Jev may choose must be
  * declared in the machine's `schemas.events` with a runtime schema such as
  * Zod; `types<T>()` has no runtime shape and is rejected.
  */
 export interface JevOptions<TEvent extends EventObject = EventObject, TContext extends MachineContext = any> {
-  /** Event types jev may choose from. Exact types or wildcards like `'agent.*'`. */
+  /** Event types Jev may choose from. Exact types or wildcards like `'agent.*'`. */
   events: string | readonly string[];
-  /** What jev is trying to do. Receives the `jev.ask` input, if any. */
+  /** What Jev is trying to do. Receives the `jev.ask` input, if any. */
   instructions: string | ((snapshot: JevSnapshot<TContext, TEvent>, input: unknown) => string);
-  /** What jev sees. Defaults to `{ value, context }` (plus `input` when there is one). */
+  /** What Jev sees. Defaults to `{ value, context }` (plus `input` when there is one). */
   state?: (snapshot: JevSnapshot<TContext, TEvent>, input: unknown) => unknown;
   /**
    * The payloads to offer right now, per event type, usually drawn from
@@ -109,19 +109,19 @@ export interface JevOptions<TEvent extends EventObject = EventObject, TContext e
   /**
    * Fields every event this agent sends carries, at one value: who the agent
    * is, when several can act (`{ player: 'O' }`, `{ by: 'jev' }`). They are
-   * set on every option, so jev is never asked to choose them, and they are
+   * set on every option, so Jev is never asked to choose them, and they are
    * left out of option ids, which they would not tell apart.
    */
   fixed?: Record<string, unknown>;
   /**
-   * Text jev reads for each option. Defaults to the machine's own words: the
+   * Text Jev reads for each option. Defaults to the machine's own words: the
    * transition's `description`, else the event schema's (Zod `.describe()`),
    * followed by the payload with each field's description.
    */
   describe?: (event: TEvent, snapshot: JevSnapshot<TContext, TEvent>) => string;
   /**
    * Describe the state each option leads to, computed with the pure
-   * `transition()`. `true` lists what changes in what jev sees (`state`, or
+   * `transition()`. `true` lists what changes in what Jev sees (`state`, or
    * the state value and context): `path: before → after` per changed field;
    * and when the move enters timed states (`after`), what it comes to once
    * they have run, their `xstate.after` events sent in turn.
@@ -140,7 +140,7 @@ export interface JevOptions<TEvent extends EventObject = EventObject, TContext e
         event: TEvent,
       ) => string | undefined);
   /**
-   * Show jev the machine itself beside the state (`machine`): every state
+   * Show Jev the machine itself beside the state (`machine`): every state
    * with its description (`*` marks the current ones), and what leaves it:
    * each event and where it goes and what it sets in context, each delay and
    * how long it is. A transition written as a function shows the targets and
@@ -209,7 +209,7 @@ export interface JevDecision<TEvent extends EventObject = EventObject> {
    */
   key: string | null;
   /**
-   * How big the request was, in characters of JSON: what jev saw (`state`),
+   * How big the request was, in characters of JSON: what Jev saw (`state`),
    * the questions, and both. Roughly 4 characters make a token. `null` when no
    * request was made. Questions a client adds on its way out are not counted.
    */

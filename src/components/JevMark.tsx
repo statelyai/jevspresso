@@ -1,5 +1,5 @@
 /**
- * The jev diamond. One glyph, used everywhere jev is referenced: the
+ * The Jev diamond. One glyph, used everywhere Jev is referenced: the
  * machine callout, the "jev is deciding" header, the chosen-action row and
  * the legend.
  */

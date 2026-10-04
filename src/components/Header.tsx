@@ -5,16 +5,16 @@ export interface HeaderProps {
   onText: (text: string) => void;
   onSubmit: () => void;
   onRush: () => void;
-  /** While jev asks "did you mean…?", the box takes a reply instead of an order. */
+  /** While Jev asks "did you mean…?", the box takes a reply instead of an order. */
   replying: boolean;
   speed: number;
   onSpeed: (speed: number) => void;
   onReset: () => void;
   inspectorOpen: boolean;
   onInspector: () => void;
-  /** When the jev key in use is yours, from this browser: take it out. */
+  /** When the Jev key in use is yours, from this browser: take it out. */
   onForgetKey?: () => void;
-  /** Save jev's requests and responses so far. */
+  /** Save Jev's requests and responses so far. */
   onDownloadLog?: () => void;
 }
 
@@ -99,12 +99,12 @@ export function Header(props: HeaderProps) {
           Reset
         </button>
         {onDownloadLog ? (
-          <button type="button" onClick={onDownloadLog} className={ICON} aria-label="Download jev's log" title="Download jev's requests and responses (JSON)">
+          <button type="button" onClick={onDownloadLog} className={ICON} aria-label="Download Jev's log" title="Download Jev's requests and responses (JSON)">
             <DownloadIcon />
           </button>
         ) : null}
         {onForgetKey ? (
-          <button type="button" onClick={onForgetKey} className={ICON} aria-label="Forget key" title="Remove your jev key from this browser">
+          <button type="button" onClick={onForgetKey} className={ICON} aria-label="Forget key" title="Remove your Jev key from this browser">
             <ForgetKeyIcon />
           </button>
         ) : null}

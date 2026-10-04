@@ -8,7 +8,7 @@ import type { JevAnswer, JevRequest, JevResponse, JevText } from './types';
 export type MockScorer = (args: {
   questionId: string;
   option?: string;
-  /** For choice questions: the option's text, as jev reads it (with its lookahead). */
+  /** For choice questions: the option's text, as Jev reads it (with its lookahead). */
   criterion?: JevText;
   state: unknown;
 }) => number | undefined;
@@ -26,7 +26,7 @@ function confidenceOf(probabilities: Record<string, number>): number {
   return Number(Math.min(1, top - second + top * 0.3).toFixed(3));
 }
 
-/** Answers in exactly the shape jev returns, from a heuristic plus a little noise. */
+/** Answers in exactly the shape Jev returns, from a heuristic plus a little noise. */
 export function mockAnswers(request: JevRequest, score: MockScorer = () => undefined): JevResponse {
   const answers: Record<string, JevAnswer> = {};
   for (const [questionId, q] of Object.entries(request.questions)) {

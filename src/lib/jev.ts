@@ -1,5 +1,5 @@
 /**
- * Server-side jev wrapper: TanStack Start server functions, and the SDK
+ * Server-side Jev wrapper: TanStack Start server functions, and the SDK
  * client is only constructed inside them. The key comes from the environment
  * (`TYPESAFE_API_KEY`), in development too, and then never reaches the
  * browser. Without it the bar is closed (`jevAvailable`), unless you give a
@@ -15,7 +15,7 @@ import { userKey } from './key';
 import { logged } from './jevLog';
 import type { BarSnapshot, ParsedOrder } from './types';
 
-/** Is jev configured? The page checks before opening the bar. */
+/** Is Jev configured? The page checks before opening the bar. */
 export const jevAvailable = createServerFn({ method: 'GET' }).handler(async () => Boolean(process.env.TYPESAFE_API_KEY));
 
 let envClient: TypeSafeClient | null = null;
@@ -23,7 +23,7 @@ let envClient: TypeSafeClient | null = null;
 /** The server's own key if it has one; otherwise the key that came with the request, for this call only. */
 function clientFor(apiKey: string | undefined): TypeSafeClient {
   if (process.env.TYPESAFE_API_KEY) return (envClient ??= new TypeSafeClient({ timeout: 30_000 }));
-  if (!apiKey) throw new Error('No jev key: set TYPESAFE_API_KEY, or give one on the page.');
+  if (!apiKey) throw new Error('No Jev key: set TYPESAFE_API_KEY, or give one on the page.');
   return new TypeSafeClient({ apiKey, timeout: 30_000 });
 }
 

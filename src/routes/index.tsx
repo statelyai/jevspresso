@@ -23,7 +23,7 @@ import { NeedsKey, useJevKey } from '../components/NeedsKey';
 import { barMachine, type BaristaAgent } from '../machines';
 import { PACE_SETTLE, toBarDecision, type JevPace } from '../lib/barista';
 
-// The bar needs jev's key: from the environment, or your own, kept in this
+// The bar needs Jev's key: from the environment, or your own, kept in this
 // browser. Without one the bar still shows, under a note that it needs one.
 export const Route = createFileRoute('/')({
   loader: () => jevAvailable(),
@@ -52,7 +52,7 @@ function pct(n: number) {
   return `${Math.round(n * 100)}%`;
 }
 
-/** What the barista is doing: watching the bar, asking jev, or hands on something. */
+/** What the barista is doing: watching the bar, asking Jev, or hands on something. */
 function BaristaStatus({
   state,
   hands,
@@ -62,7 +62,7 @@ function BaristaStatus({
   state: BaristaState;
   hands: HandsView | null;
   ctx: ViewBar;
-  /** When jev decides next, while it holds back at a slower pace: the window to step in. */
+  /** When Jev decides next, while it holds back at a slower pace: the window to step in. */
   nextMoveAt?: number;
 }) {
   if (hands) {
@@ -95,14 +95,14 @@ function BaristaStatus({
 }
 
 const PACES: Array<{ pace: JevPace; label: string; title: string }> = [
-  { pace: 1, label: '1×', title: 'jev moves as soon as it can' },
-  { pace: 0.5, label: '½×', title: 'jev waits 2s after each move, for you to step in' },
+  { pace: 1, label: '1×', title: 'Jev moves as soon as it can' },
+  { pace: 0.5, label: '½×', title: 'Jev waits 2s after each move, for you to step in' },
 ];
 
-/** How fast jev plays, apart from how fast the bar runs: slower leaves a window after each move to cause trouble in. */
+/** How fast Jev plays, apart from how fast the bar runs: slower leaves a window after each move to cause trouble in. */
 function PaceControl({ pace, onPace }: { pace: JevPace; onPace: (pace: JevPace) => void }) {
   return (
-    <div role="radiogroup" aria-label="jev pace" className="flex shrink-0 items-center rounded-full border border-[#3a3936] p-0.5 text-[13px]">
+    <div role="radiogroup" aria-label="Jev pace" className="flex shrink-0 items-center rounded-full border border-[#3a3936] p-0.5 text-[13px]">
       {PACES.map((p) => (
         <button
           key={p.pace}
@@ -120,7 +120,7 @@ function PaceControl({ pace, onPace }: { pace: JevPace; onPace: (pace: JevPace) 
   );
 }
 
-/** Stop jev from being asked, so you can work the bar; or hand it back. Either way, you can click. */
+/** Stop Jev from being asked, so you can work the bar; or hand it back. Either way, you can click. */
 function PauseButton({ paused, onToggle }: { paused: boolean; onToggle: () => void }) {
   return (
     <button
@@ -134,14 +134,14 @@ function PauseButton({ paused, onToggle }: { paused: boolean; onToggle: () => vo
       <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
         {paused ? <path d="M3 1.5 L10.5 6 L3 10.5 Z" /> : <path d="M2.5 1.5 H5 V10.5 H2.5 Z M7 1.5 H9.5 V10.5 H7 Z" />}
       </svg>
-      {paused ? 'Resume jev' : 'Pause jev'}
+      {paused ? 'Resume Jev' : 'Pause Jev'}
     </button>
   );
 }
 
 function Bar({ onForgetKey }: { onForgetKey?: () => void }) {
   const [snapshot, send, actorRef] = useMachine(barMachine);
-  // The barista: a jev agent invoked at the top of the bar. Its own snapshot
+  // The barista: a Jev agent invoked at the top of the bar. Its own snapshot
   // says whether it is deciding or paused, with its decisions; what its
   // hands are doing is the bar's.
   const agentRef = snapshot.children.barista as ActorRefFrom<BaristaAgent> | undefined;
@@ -183,7 +183,7 @@ type BaristaState = 'watching' | 'thinking' | 'working' | 'paused';
 const SIDE_TABS = ['History', 'Ingredients', 'Chaos'] as const;
 type SideTab = (typeof SIDE_TABS)[number];
 
-/** Under jev's decision: its history, the ingredients, and chaos, one at a time. */
+/** Under Jev's decision: its history, the ingredients, and chaos, one at a time. */
 function SideTabs({ tab, onTab, historyCount }: { tab: SideTab; onTab: (tab: SideTab) => void; historyCount: number }) {
   const { barRef, pillRef } = useSlidingPill(SIDE_TABS.indexOf(tab));
   return (
@@ -211,13 +211,13 @@ export interface BarViewProps {
     nextDecisionAt?: number;
   };
   send: (event: EventFromLogic<typeof barMachine>) => void;
-  /** Would the bar take this move from you now? What a click is checked against, as jev's picks are. */
+  /** Would the bar take this move from you now? What a click is checked against, as Jev's picks are. */
   can?: (move: BaristaMove) => boolean;
-  /** Stop or start asking jev. */
+  /** Stop or start asking Jev. */
   onPause?: (paused: boolean) => void;
-  /** How fast jev plays. */
+  /** How fast Jev plays. */
   onPace?: (pace: JevPace) => void;
-  /** Take your own jev key out of this browser (shown only when it is yours in use). */
+  /** Take your own Jev key out of this browser (shown only when it is yours in use). */
   onForgetKey?: () => void;
   /** The actor the inspector attaches to. */
   inspect?: AnyActor;
@@ -238,7 +238,7 @@ export function BarView({ ctx: bar, intake, barista, send, inspect, timers, can,
   // The order a drink started by hand goes to first; none once it is done.
   const [pick, setPick] = useState<string | null>(null);
   const selected = open.some((d) => d.id === pick) ? pick : null;
-  // Working the bar by hand: the same events jev sends, checked the same way.
+  // Working the bar by hand: the same events Jev sends, checked the same way.
   // By you: your own hands, the bar's shared equipment.
   const act = (move: BaristaMove) => send({ ...move, by: 'you' });
   const interact = can ? { can, act, selected, breakIt: (device: Device) => send({ type: 'BREAK', device }) } : undefined;
@@ -258,7 +258,7 @@ export function BarView({ ctx: bar, intake, barista, send, inspect, timers, can,
 
   const { clarifying, routing, parsing } = intake;
   const { state, decisions } = barista;
-  // Two baristas: jev's hands, and yours.
+  // Two baristas: Jev's hands, and yours.
   const jevHands = handsView(ctx, 'jev');
   const yourHands = handsView(ctx, 'you');
   const hands = allHands(ctx);
@@ -352,7 +352,7 @@ export function BarView({ ctx: bar, intake, barista, send, inspect, timers, can,
                 <BaristaStatus state={state} hands={jevHands} ctx={ctx} nextMoveAt={barista.pace && barista.pace < 1 ? barista.nextDecisionAt : undefined} />
                 {onPause ? <PauseButton paused={state === 'paused'} onToggle={() => onPause(state !== 'paused')} /> : null}
                 {onPace ? <PaceControl pace={barista.pace ?? 1} onPace={onPace} /> : null}
-                {/* Your hands, apart from jev's: the second barista. */}
+                {/* Your hands, apart from Jev's: the second barista. */}
                 {yourHands ? (
                   <div className="flex min-w-0 items-center gap-2 rounded-full bg-[#e8845f] px-3.5 py-1.5 text-[13px] font-medium text-[#1f0f08]">
                     <HandIcon size={15} />

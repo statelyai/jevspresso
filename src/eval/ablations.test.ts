@@ -4,7 +4,7 @@ import { ABLATIONS } from './ablations';
 import { baristaMock } from './mock';
 import { runScenario, SCENARIOS } from './scenarios';
 
-/** A real request: the first one jev gets with the front full of empty cups (asked as an ablation's agent would ask it). */
+/** A real request: the first one Jev gets with the front full of empty cups (asked as an ablation's agent would ask it). */
 async function firstRequest(agent?: string): Promise<JevRequest> {
   let request: JevRequest | undefined;
   await runScenario(SCENARIOS.find((s) => s.id === 'cups-in-the-way')!, async (r) => ((request ??= r), baristaMock(r)), {

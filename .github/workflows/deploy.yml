@@ -1,5 +1,5 @@
 # Every push to main is tested, built and deployed to Cloudflare Workers
-# (https://jevspresso.davidkpiano.workers.dev).
+# (https://jevspresso.dev).
 #
 # Needs one repository secret, CLOUDFLARE_API_TOKEN: a Cloudflare API token
 # with the "Edit Cloudflare Workers" template. The account is set in

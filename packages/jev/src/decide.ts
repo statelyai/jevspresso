@@ -46,7 +46,7 @@ function shared(group: JevOption[]): string {
  * A type with several variants, as one criterion: what they share, then every
  * variant by what tells it apart (its id after the type) and what it comes to
  * (its lookahead, from `Once done` when it has one). All of them: a type is
- * only as good as its best variant, and which that is is jev's call.
+ * only as good as its best variant, and which that is is Jev's call.
  */
 function typeCriterion(type: string, group: JevOption[]): string {
   const what = sharedParts(group)?.what ?? shared(group);
@@ -183,7 +183,7 @@ function fingerprint(value: unknown): string {
 }
 
 /** The options, and the exact request `decide` would send for them. */
-/** What jev sees: `opts.state`, or `{ value, context }` (plus `input` when there is one). */
+/** What Jev sees: `opts.state`, or `{ value, context }` (plus `input` when there is one). */
 export function stateOf<TEvent extends EventObject, TContext extends MachineContext>(
   snapshot: JevSnapshot<TContext, TEvent>,
   opts: JevOptions<TEvent, TContext>,
@@ -194,7 +194,7 @@ export function stateOf<TEvent extends EventObject, TContext extends MachineCont
     : { ...(input === undefined ? {} : { input }), value: snapshot.value, context: snapshot.context };
 }
 
-/** What jev sees, with the machine's map beside it (`machine`). */
+/** What Jev sees, with the machine's map beside it (`machine`). */
 function withMap(state: unknown, map: string): unknown {
   return state && typeof state === 'object' && !Array.isArray(state) ? { ...state, machine: map } : { state, machine: map };
 }
@@ -233,7 +233,7 @@ export function requestKey<TEvent extends EventObject, TContext extends MachineC
 }
 
 /**
- * Ask jev which event to send next. Pass `input` to route external input
+ * Ask Jev which event to send next. Pass `input` to route external input
  * (a message, a reply) to an event instead of acting on the state alone.
  * Nothing is sent: `decision.event` is for the caller to deliver.
  */

@@ -2,7 +2,7 @@ import { mockAnswers, NOOP_ID, type JevClient, type MockScorer } from '@xstate/j
 import type { BarSnapshot } from '../lib/types';
 
 /**
- * Mock barista: a standalone heuristic over what jev itself reads, the bar and
+ * Mock barista: a standalone heuristic over what Jev itself reads, the bar and
  * each option's text with its lookahead ("Once done (after 2.5s): …"). It moves cups toward
  * the orders they are on track for, gets a shot or milk going when an order
  * still needs one, and clears away what no order wants. It never makes a
@@ -67,7 +67,7 @@ function baristaScore(bar: BarSnapshot, option: string, text: string): number {
 }
 
 /**
- * The mock jev client for the barista. Asked hierarchically, an event type
+ * The mock Jev client for the barista. Asked hierarchically, an event type
  * scores as its best variant (from that type's own question).
  */
 export const baristaMock: JevClient = async (req) => {

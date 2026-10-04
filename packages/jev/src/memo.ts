@@ -7,7 +7,7 @@ export interface MemoizeOptions {
 
 /**
  * Wrap a client so an identical request (same state, same questions) gets the
- * response it got before, marked `cached: true`, without calling jev again.
+ * response it got before, marked `cached: true`, without calling Jev again.
  * Identical requests in flight at the same time share one call. Failed
  * requests are not remembered.
  */

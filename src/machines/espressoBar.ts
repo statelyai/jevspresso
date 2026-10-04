@@ -52,15 +52,15 @@ const parseOrderActor = createAsyncLogic<ParsedOrder, { text: string }>({
 });
 
 /**
- * The barista: a jev agent invoked at the top of the bar, deciding on it (its
- * parent) whenever it changes. Provided in `machines/index.ts`, with the jev
+ * The barista: a Jev agent invoked at the top of the bar, deciding on it (its
+ * parent) whenever it changes. Provided in `machines/index.ts`, with the Jev
  * client. The bar has no states for it: what the barista is doing is the
  * `hands` region, like any other resource.
  */
 const barista: AnyActorLogic = createCallbackLogic(() => {});
 
 /**
- * The order router: a jev agent the bar asks with the customer's reply (it
+ * The order router: a Jev agent the bar asks with the customer's reply (it
  * decides only when asked). It hands `order.confirm` / `order.cancel` straight
  * back to the bar.
  */
@@ -153,7 +153,7 @@ function spend(inv: Inventory, cost: Spend): Inventory {
   return next;
 }
 
-/** Who is acting: every barista event says (`by`), jev's own picks included (its agent's `fixed`). */
+/** Who is acting: every barista event says (`by`), Jev's own picks included (its agent's `fixed`). */
 type By = { by: Barista };
 
 /** This barista's hands are on something already. */
@@ -240,7 +240,7 @@ const handsDelay =
 /**
  * Every barista action is a real event, and every guard is just the body of
  * its transition function: return nothing and the transition is not taken,
- * which is exactly what `snapshot.can(event)` reports back to jev and to the
+ * which is exactly what `snapshot.can(event)` reports back to Jev and to the
  * UI. The guards are physics, not recipes. What state the portafilter or the
  * pitcher is in decides which of their events are handled at all (they are
  * handled only in their regions' states where they make sense); the functions
@@ -281,7 +281,7 @@ function declinable(bar: Bar, drink: Drink): boolean {
   return !MILK_TYPES.some((milk) => substitutable(bar, drink, milk));
 }
 
-/** Knocking out grounds before their shot is pulled: what jev reads for it. */
+/** Knocking out grounds before their shot is pulled: what Jev reads for it. */
 const UNPULLED = 'knock the unpulled grounds out of the portafilter: they are wasted, and the next shot starts over with a new grind';
 
 /** Knocking out whatever is in the portafilter, pulled or not: from any resting state but empty. */
@@ -453,18 +453,18 @@ export const espressoBarMachine = setup({
       /** An order as typed, and when (`at`): the time it waits from. */
       'order.submit': types<{ text: string; at: number }>(),
       'order.reply': types<{ text: string }>(),
-      // Events jev may choose need runtime schemas (Zod): @xstate/jev reads
+      // Events Jev may choose need runtime schemas (Zod): @xstate/jev reads
       // them to build and check each option.
       'order.confirm': z.object({}),
       'order.cancel': z.object({}),
       BREAK: types<{ device: Device }>(),
       /** From the ingredients panel: set how much of an ingredient there is, from nothing up to full. */
       SET_STOCK: types<{ ingredient: Ingredient; amount: number }>(),
-      // The baristas' vocabulary. jev picks one of these, fully instantiated,
+      // The baristas' vocabulary. Jev picks one of these, fully instantiated,
       // and the machine's own transitions decide whether it lands. Every one
-      // says who makes it (`by`): jev, or you. Ids come from the barista's
+      // says who makes it (`by`): Jev, or you. Ids come from the barista's
       // payloads; the enums are read from the schema. The descriptions are
-      // what jev reads for each option: what the move is, and where it fits
+      // what Jev reads for each option: what the move is, and where it fits
       // in making a drink. They are knowledge, not rules: nothing here stops
       // a move the bar allows.
       'barista.repair': z
@@ -640,7 +640,7 @@ export const espressoBarMachine = setup({
             },
             onError: ({ event }) => ({
               target: 'idle',
-              context: { error: `jev parse failed: ${String((event as { error?: unknown }).error)}` },
+              context: { error: `Jev parse failed: ${String((event as { error?: unknown }).error)}` },
             }),
           },
         },
@@ -683,13 +683,13 @@ export const espressoBarMachine = setup({
                   context: {
                     error:
                       event.decision.reason === 'low-confidence'
-                        ? `jev was only ${Math.round(event.decision.confidence * 100)}% sure what you meant — is the order right?`
+                        ? `Jev was only ${Math.round(event.decision.confidence * 100)}% sure what you meant — is the order right?`
                         : 'That did not answer the question — is the order right?',
                   },
                 }),
                 'jev.failed': ({ event }) => ({
                   target: 'asking',
-                  context: { error: `jev routing failed: ${event.error}` },
+                  context: { error: `Jev routing failed: ${event.error}` },
                 }),
               },
             },

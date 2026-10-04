@@ -29,12 +29,12 @@ export interface DecisionCardProps {
   now: number;
   thinking: boolean;
   loop?: JevLoop | null;
-  /** jev is not being asked: a person is working the bar. */
+  /** Jev is not being asked: a person is working the bar. */
   paused?: boolean;
 }
 
 /**
- * jev's latest pick and the options it weighed. Every slot is always drawn
+ * Jev's latest pick and the options it weighed. Every slot is always drawn
  * (three runner-ups, the details and the status line) so the card keeps one
  * size as decisions come and go.
  */
@@ -56,7 +56,7 @@ export function DecisionCard({ decisions, drinks, now, thinking, loop, paused }:
       : null;
 
   return (
-    <section aria-label="jev" aria-live="polite" className="flex min-w-0 flex-col gap-3 rounded-xl border border-[#2a2a28] bg-[#1d1d1b] p-4">
+    <section aria-label="Jev" aria-live="polite" className="flex min-w-0 flex-col gap-3 rounded-xl border border-[#2a2a28] bg-[#1d1d1b] p-4">
         <div className="flex h-7 min-w-0 items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <JevMark size={12} color={thinking || !latest ? '#a8a49c' : '#34d399'} className={thinking ? 'animate-pulse' : undefined} />
@@ -107,7 +107,7 @@ export function DecisionCard({ decisions, drinks, now, thinking, loop, paused }:
   );
 }
 
-/** jev's decisions before the latest, newest first. */
+/** Jev's decisions before the latest, newest first. */
 export function DecisionHistory({ decisions, drinks }: { decisions: Decision[]; drinks: Drink[] }) {
   return (
     <ol aria-label="History" className="flex min-w-0 flex-col gap-2 text-[13px]">

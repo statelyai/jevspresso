@@ -10,7 +10,7 @@ import { blockedBy, spotAction } from './view';
 import { baristaMock } from '../eval/mock';
 import type { Addition, Bar, BarContext, MilkTexture, PourMl, BarEvent, BaristaEvent, BarSnapshot, Cup, Drink, ParsedOrder } from './types';
 
-/* ------------------------------------------------------------- fake jev ---- */
+/* ------------------------------------------------------------- fake Jev ---- */
 // The tests' stand-in for jev: `mockAnswers` from @xstate/jev, scored by these
 // (the barista's is shared with the scenarios: `baristaMock`).
 
@@ -164,7 +164,7 @@ afterEach(() => {
 });
 
 describe('physics, not recipes', () => {
-  it('offers what is physically possible even with no orders: jev is not told what is wise', () => {
+  it('offers what is physically possible even with no orders: Jev is not told what is wise', () => {
     const ids = legalIds(ctx());
     expect(ids).toEqual(expect.arrayContaining(['barista.grindBeans', 'barista.placeCup:tray', 'noop']));
     // Every milk, steamed or foamed, from the schema's enum.
@@ -435,11 +435,11 @@ describe('a pure machine', () => {
   });
 });
 
-describe('two baristas: jev and you', () => {
-  it('each has their own hands: you grind while jev steams', () => {
+describe('two baristas: Jev and you', () => {
+  it('each has their own hands: you grind while Jev steams', () => {
     const actor = bar(ctx({ drinks: [order()] }));
     actor.send({ type: 'barista.steamMilk', milk: 'whole', by: 'jev' });
-    expect(actor.getSnapshot().can({ type: 'barista.grindBeans', by: 'jev' })).toBe(false); // jev's hands are on the pitcher
+    expect(actor.getSnapshot().can({ type: 'barista.grindBeans', by: 'jev' })).toBe(false); // Jev's hands are on the pitcher
     expect(actor.getSnapshot().can({ type: 'barista.grindBeans', by: 'you' })).toBe(true);
     actor.send({ type: 'barista.grindBeans', by: 'you' });
     expect(actor.getSnapshot().context.hands).toMatchObject({ jev: { doing: 'barista.steamMilk' }, you: { doing: 'barista.grindBeans' } });
@@ -447,7 +447,7 @@ describe('two baristas: jev and you', () => {
     expect(actor.getSnapshot().can({ type: 'barista.placeCup', spot: 'tray', by: 'you' })).toBe(false);
   });
 
-  it('shares the equipment: you cannot take the portafilter out while jev pulls a shot', () => {
+  it('shares the equipment: you cannot take the portafilter out while Jev pulls a shot', () => {
     const actor = bar(ctx({ portafilter: 'locked', cups: [cup('c1', 'tray')] }));
     actor.send({ type: 'barista.extract', by: 'jev' });
     finishHands(actor);
@@ -457,7 +457,7 @@ describe('two baristas: jev and you', () => {
     expect(s.can({ type: 'barista.placeCup', spot: 'front', by: 'you' })).toBe(true);
   });
 
-  it("tells jev what the other barista's hands are on", () => {
+  it("tells Jev what the other barista's hands are on", () => {
     const actor = bar(ctx({ drinks: [order()] }));
     actor.send({ type: 'barista.placeCup', spot: 'tray', by: 'you' });
     expect(serializeBar(barOf(actor.getSnapshot())).otherBarista).toBe('placeCup (cup c1)');
@@ -475,14 +475,14 @@ describe('a cup in the way', () => {
       pitcher: { milk: 'whole', texture: 'steamed', ml: 240 },
     });
 
-  it('tells jev what stands in the way, as a fact', () => {
+  it('tells Jev what stands in the way, as a fact', () => {
     expect(serializeBar(staged()).queue[0].blockedBy).toBe(
       'the front of the counter is full: ' +
         ['c2', 'c3', 'c4'].map((id) => `cup ${id} (nothing), which no open order could become`).join('; '),
     );
   });
 
-  it('tells jev what the machine refuses right now: nothing reaches the front, and no new cup fits', async () => {
+  it('tells Jev what the machine refuses right now: nothing reaches the front, and no new cup fits', async () => {
     const client = vi.fn<JevClient>(async () => ({ answers: {} }));
     await decide(snap(staged()), { ...barista, client });
     const { questions } = client.mock.calls[0][0];
@@ -523,7 +523,7 @@ describe('broken machines behind a busy tray', () => {
       equipment: { grinder: 'broken', groupHead: 'ok', steamWand: 'broken' },
     });
 
-  it('tells jev every obstacle, the broken machines first; an earlier order on the tray is just its turn', () => {
+  it('tells Jev every obstacle, the broken machines first; an earlier order on the tray is just its turn', () => {
     expect(serializeBar(stuck()).queue[1].blockedBy).toBe('the grinder is broken; the steam wand is broken');
     expect(serializeBar(stuck()).queue[0].blockedBy).toBe('the grinder is broken');
   });
@@ -551,7 +551,7 @@ describe('broken machines behind a busy tray', () => {
 
 });
 
-describe('jev as the barista', () => {
+describe('Jev as the barista', () => {
   it("reads each option in the machine's own words, and what it comes to once done", () => {
     const lookahead = (o: ReturnType<typeof getOptions>[number] | undefined) => (o?.kind === 'event' ? o.lookahead : undefined);
     const options = getOptions(snap(ctx({ drinks: [order()] })), barista);
@@ -574,7 +574,7 @@ describe('jev as the barista', () => {
     expect(options.at(-1)).toMatchObject({ kind: 'noop', id: 'noop' });
   });
 
-  it('shows jev the whole shot and the whole pitcher in the machine map, and what each step sets, read from the transitions', () => {
+  it('shows Jev the whole shot and the whole pitcher in the machine map, and what each step sets, read from the transitions', () => {
     const map = machineMap(snap(ctx()));
     for (const line of [
       'on barista.grindBeans → grinding (conditional); sets hands, inventory',
@@ -644,14 +644,14 @@ describe('jev as the barista', () => {
       return res;
     };
 
-  /** The barista's jev agent, invoked at the top of the bar: its own state and decisions. */
+  /** The barista's Jev agent, invoked at the top of the bar: its own state and decisions. */
   const baristaOf = (actor: ReturnType<typeof openBar>) =>
     actor.getSnapshot().children.barista!.getSnapshot() as unknown as {
       value: 'watching' | 'deciding' | 'paused';
       context: JevAgentContext<BarEvent>;
     };
 
-  it('watches the bar, asks jev, acts on the bar and logs the decision', async () => {
+  it('watches the bar, asks Jev, acts on the bar and logs the decision', async () => {
     const actor = openBar(ctx({ drinks: [order()] }), mockClient);
     await vi.waitFor(() => expect(baristaOf(actor).context.decisions).toHaveLength(1));
     const [decision] = baristaOf(actor).context.decisions;
@@ -699,7 +699,7 @@ describe('jev as the barista', () => {
     expect(barOf(actor.getSnapshot()).portafilter).toBe('grinding');
   });
 
-  it('after deciding to wait, does not ask jev again until something jev would see changes', async () => {
+  it('after deciding to wait, does not ask Jev again until something Jev would see changes', async () => {
     const client = vi.fn(choosing('noop'));
     const actor = openBar(ctx({ speed: 10 }), client);
     actor.send({ type: 'BREAK', device: 'grinder' }); // a choice: repair it, or wait
@@ -712,10 +712,10 @@ describe('jev as the barista', () => {
     await vi.waitFor(() => expect(client).toHaveBeenCalledTimes(2));
   });
 
-  it('flags an idle loop: jev keeps being asked, and keeps saying wait', async () => {
+  it('flags an idle loop: Jev keeps being asked, and keeps saying wait', async () => {
     const client = vi.fn(choosing('noop'));
     const actor = openBar(ctx({ speed: 10, drinks: [order()] }), client);
-    // Each speed change rewrites the hands-on times jev reads, so every
+    // Each speed change rewrites the hands-on times Jev reads, so every
     // request is new and none is skipped; every answer is still "wait".
     for (const [i, speed] of [5, 3, 2, 1.5].entries()) {
       await vi.waitFor(() => expect(client).toHaveBeenCalledTimes(i + 1));
@@ -726,7 +726,7 @@ describe('jev as the barista', () => {
     await vi.waitFor(() => expect(baristaOf(actor).context.loop).toMatchObject({ kind: 'idle', count: 5 }));
   });
 
-  it("does not ask jev while there is nothing it could do: the barista's hands are busy", async () => {
+  it("does not ask Jev while there is nothing it could do: the barista's hands are busy", async () => {
     const client = vi.fn(mockClient);
     const actor = openBar(ctx({ drinks: [order()], hands: { jev: { doing: 'barista.restock', ms: 100_000 }, you: null } }), client);
     await new Promise((r) => setTimeout(r, 450)); // time passes; only waiting is possible
@@ -756,7 +756,7 @@ describe('jev as the barista', () => {
     expect(baristaOf(actor).context.decisions).toHaveLength(0);
   });
 
-  it('stops asking jev while paused, and starts again on resume', async () => {
+  it('stops asking Jev while paused, and starts again on resume', async () => {
     const client = vi.fn<JevClient>(baristaMock);
     const actor = openBar(ctx({ drinks: [order()] }), client);
     const b = actor.getSnapshot().children.barista!;
@@ -788,7 +788,7 @@ describe('working the bar by hand', () => {
     expect(at('jug', ctx()).breaks).toBe('steamWand');
     expect(at('grinder', ctx({ equipment: { grinder: 'broken', groupHead: 'ok', steamWand: 'ok' } })).breaks).toBeUndefined();
     expect(at('tray', ctx()).breaks).toBeUndefined();
-    // Not a barista's move: jev is never offered it.
+    // Not a barista's move: Jev is never offered it.
     expect(legalIds(ctx({ drinks: [order()] })).some((id) => id.startsWith('BREAK'))).toBe(false);
   });
 
@@ -819,7 +819,7 @@ describe('working the bar by hand', () => {
   });
 });
 
-describe('jev as the order router', () => {
+describe('Jev as the order router', () => {
   const pendingOrder: ParsedOrder = {
     items: [{ drink: 'latte', qty: 1, milk: 'oat', decaf: false, iced: false }],
     intent: 'order',
@@ -829,7 +829,7 @@ describe('jev as the order router', () => {
   };
 
   /**
-   * A freshly started bar (so the router is invoked, with jev's mock called
+   * A freshly started bar (so the router is invoked, with Jev's mock called
    * in-process) that read an order back and waits for the customer's reply.
    */
   async function clarifyingBar() {

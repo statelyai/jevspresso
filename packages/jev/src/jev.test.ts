@@ -130,7 +130,7 @@ describe('getOptions', () => {
     expect(getOptions(start().getSnapshot(), base)[0].description).toBe('agent.move:kitchen');
   });
 
-  it('by default, the lookahead lists what changes in what jev sees', () => {
+  it('by default, the lookahead lists what changes in what Jev sees', () => {
     const lookahead = (o: { id: string }[], id: string) => (o.find((x) => x.id === id) as { lookahead?: string }).lookahead;
     const raw = getOptions(start().getSnapshot(), { ...base, lookahead: true });
     expect(lookahead(raw, 'agent.lamp:dim')).toBe('context.lamp: "off" → "dim"');
@@ -184,7 +184,7 @@ describe('getOptions', () => {
     });
   });
 
-  it('shows jev the machine itself, on request: states, where events lead, delays', async () => {
+  it('shows Jev the machine itself, on request: states, where events lead, delays', async () => {
     const client = vi.fn(scripted(() => undefined));
     await decide(start().getSnapshot(), { ...base, map: true, client });
     const { state } = client.mock.calls[0][0] as { state: { machine: string } };
@@ -281,7 +281,7 @@ describe('getOptions', () => {
   });
 
   it('sets `fixed` fields on every option, and leaves them out of option ids', () => {
-    // Two players take turns; jev plays O.
+    // Two players take turns; Jev plays O.
     const game = createMachine({
       schemas: {
         context: types<{ turn: 'X' | 'O' }>(),
@@ -306,7 +306,7 @@ describe('getOptions', () => {
     expect(getOptions(snapshot, { events: 'move', instructions: 'play' }).map((o) => o.id)).toEqual(['move:O:a', 'move:O:b']);
   });
 
-  it('refuses an event jev may choose without a runtime schema', () => {
+  it('refuses an event Jev may choose without a runtime schema', () => {
     const typesOnly = createMachine({
       schemas: { events: { 'agent.go': types<{ to: string }>() } },
       on: { 'agent.go': () => ({}) },
@@ -372,7 +372,7 @@ describe('decide', () => {
     expect(variants.criteria['agent.lamp:dim']).toBe('level: dim (afterwards: context.lamp: "off" → "dim")');
   });
 
-  it('tells jev what the machine refuses right now, which the options alone do not say', async () => {
+  it('tells Jev what the machine refuses right now, which the options alone do not say', async () => {
     const client = vi.fn(scripted(() => undefined));
     await decide(start().getSnapshot(), { ...base, client });
     const { instructions } = client.mock.calls[0][0].questions.action as { instructions: string };
@@ -419,7 +419,7 @@ describe('decide', () => {
     expect(d).toMatchObject({ reason: 'low-confidence', option: null, event: null });
   });
 
-  it('puts the input into the state jev sees', async () => {
+  it('puts the input into the state Jev sees', async () => {
     const client = vi.fn(scripted((_, keys) => keys.find((k) => k.endsWith('kitchen'))));
     const d = await decide(start().getSnapshot(), { ...base, client }, 'I am hungry');
     expect(client.mock.calls[0][0].state).toMatchObject({ input: 'I am hungry' });
@@ -680,7 +680,7 @@ describe('createJevLogic', () => {
     expect(target.getSnapshot().context.room).toBe('hall');
   });
 
-  it('reports a ping-pong loop, with the cache or without, and tells jev it is going in circles', async () => {
+  it('reports a ping-pong loop, with the cache or without, and tells Jev it is going in circles', async () => {
     // Always the first move: hall -> kitchen -> hall -> ...
     const pingPong = () => scripted((_, keys) => keys.find((k) => k.startsWith('agent.move')));
     const loops: JevLoop[] = [];
@@ -691,7 +691,7 @@ describe('createJevLogic', () => {
     uncached.actor.stop();
 
     // With the cache every lap after the first is free, but it is still a loop:
-    // jev is told (in what it sees), which makes a fresh request once per state.
+    // Jev is told (in what it sees), which makes a fresh request once per state.
     const client = vi.fn(pingPong());
     const onLoop = vi.fn();
     const cached = owner(start(), client, { loops: { onLoop } }, true);
@@ -707,7 +707,7 @@ describe('createJevLogic', () => {
 });
 
 describe('an agent invoked at the top of the machine it decides for', () => {
-  /** The house, with jev invoked at its top: no states of its own for jev. */
+  /** The house, with Jev invoked at its top: no states of its own for Jev. */
   function agentHouse(client: JevClient, extra: Partial<JevLogicOptions<Ev, Ctx>> = {}) {
     const agent = createJevLogic<Ev, Ctx>({ ...base, noop: 'wait', client, ...extra });
     return setup({ actors: { jev: agent } }).createMachine({

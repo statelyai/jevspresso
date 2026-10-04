@@ -47,7 +47,7 @@ function eventSchemas(machine: AnyStateMachine): Record<string, StandardSchema> 
 }
 
 /**
- * The runtime schema of an event jev may choose. Throws for an event without
+ * The runtime schema of an event Jev may choose. Throws for an event without
  * one: `types<T>()` has no runtime shape, so a missing field could not be
  * detected and an incomplete event could be sent.
  */
@@ -113,7 +113,7 @@ function valid(type: string, schema: StandardSchema, payload: Record<string, unk
   return false;
 }
 
-/** Event types jev may send that some active state node could handle. */
+/** Event types Jev may send that some active state node could handle. */
 function eventTypes(snapshot: JevSnapshot, descriptors: string | readonly string[]): string[] {
   const machine = snapshot.machine;
   const declared = new Set([...Object.keys(eventSchemas(machine)), ...machine.events]);
@@ -299,7 +299,7 @@ function settled(snapshot: JevSnapshot | null, next: JevSnapshot): { snapshot: J
 }
 
 /**
- * What changes, in what jev sees (`state`, or the state value and context):
+ * What changes, in what Jev sees (`state`, or the state value and context):
  * every changed field, `path: before → after`. When the move starts timed
  * states (`after`), then what it comes to once they have run, against how
  * things were before it.
@@ -329,9 +329,9 @@ function waitingLookahead(seen: (s: JevSnapshot) => unknown, snapshot: JevSnapsh
 }
 
 /**
- * Every event jev may choose right now, fully instantiated and accepted by
+ * Every event Jev may choose right now, fully instantiated and accepted by
  * `snapshot.can()`, plus the noop option when configured. Synchronous, and
- * no jev call is made.
+ * no Jev call is made.
  */
 export function getOptions<TEvent extends EventObject, TContext extends MachineContext>(
   snapshot: JevSnapshot<TContext, TEvent>,
@@ -344,7 +344,7 @@ export function getOptions<TEvent extends EventObject, TContext extends MachineC
 /**
  * The options, and the moves the machine refuses right now: events a current
  * state handles, whose transition is not taken (`can()` is false). They are
- * what jev cannot do, which the options alone do not say. Option ids, an
+ * what Jev cannot do, which the options alone do not say. Option ids, an
  * event type alone when every one of its variants is refused.
  */
 export function collectOptions<TEvent extends EventObject, TContext extends MachineContext>(

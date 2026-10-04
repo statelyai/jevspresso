@@ -1,7 +1,7 @@
 /**
- * What each part of what jev is shown is worth: run the scenarios with one
+ * What each part of what Jev is shown is worth: run the scenarios with one
  * part taken out of every request, and compare. Each ablation rewrites the
- * request on its way to jev, so nothing in the library or the bar changes.
+ * request on its way to Jev, so nothing in the library or the bar changes.
  */
 import type { JevClient, JevOptions, JevRequest } from '@xstate/jev';
 import { barista } from '../lib/barista';
@@ -10,7 +10,7 @@ import type { BarContext, BarEvent } from '../lib/types';
 export interface Ablation {
   id: string;
   label: string;
-  /** The request as jev would see it without this part. */
+  /** The request as Jev would see it without this part. */
   strip?: (request: JevRequest) => JevRequest;
   /** Or the barista's agent asked differently: its own settings, through the library. */
   agent?: Partial<JevOptions<BarEvent, BarContext>>;
@@ -89,7 +89,7 @@ const VALUE = String.raw`(?:"(?:[^"\\]|\\.)*"|null|-?[\d.]+|\(none\))`;
 /** Take every `path: before → after` line whose path matches out of a lookahead. */
 const dropLines = (path: string) => new RegExp(String.raw`${path}: ${VALUE} → ${VALUE}(?:; )?`, 'g');
 
-/** The queue in jev's view, without a field. */
+/** The queue in Jev's view, without a field. */
 function withoutQueueField(request: JevRequest, field: string): JevRequest {
   const state = request.state as { queue?: Array<Record<string, unknown>> };
   if (!state?.queue) return request;
@@ -137,7 +137,7 @@ export const ABLATIONS: Ablation[] = [
   },
 ];
 
-/** A client that sends jev the request without the ablated part. */
+/** A client that sends Jev the request without the ablated part. */
 export function ablated(client: JevClient, ablation: Ablation): JevClient {
   return ablation.strip ? (request) => client(ablation.strip!(request)) : client;
 }

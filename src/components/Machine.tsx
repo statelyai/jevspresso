@@ -289,7 +289,7 @@ const BOWL_BASE = 410;
 
 const TONE: Record<Exclude<PartState, 'idle'>, { stroke: string; pulse?: boolean; chip: string; text: string; bg: string }> = {
   running: { stroke: '#5aa9ff', pulse: true, chip: '#5aa9ff', text: '#9fd0ff', bg: '#0f1f30' },
-  /** jev's hands, and yours: two baristas at one bar. */
+  /** Jev's hands, and yours: two baristas at one bar. */
   hands: { stroke: '#faf9f5', chip: '#faf9f5', text: '#faf9f5', bg: '#1d1d1b' },
   yours: { stroke: '#e8845f', chip: '#e8845f', text: '#f5b69c', bg: '#2a1a12' },
   broken: { stroke: '#f0565f', chip: '#f0565f', text: '#ff9aa0', bg: '#2a1416' },
@@ -546,7 +546,7 @@ function SpotLabel({
           option(row[0])
         ),
       )}
-      {/* For you alone: jev never breaks anything on purpose. */}
+      {/* For you alone: Jev never breaks anything on purpose. */}
       {action.breaks ? (
         <button
           type="button"
@@ -590,7 +590,7 @@ function Chip({ x, w, state, label, time, warn }: { x: number; w: number; state:
 
 export interface MachineProps {
   ctx: ViewBar;
-  /** Both baristas' busy hands (`allHands`): jev's and yours. */
+  /** Both baristas' busy hands (`allHands`): Jev's and yours. */
   hands: HandsView[];
   /** Served drinks whose cup has reached its order card; the rest are still on the machine. */
   landed: ReadonlySet<string>;
@@ -602,7 +602,7 @@ export interface MachineProps {
     can: (move: BaristaMove) => boolean;
     act: (move: BaristaMove) => void;
     selected: string | null;
-    /** Break a machine: yours alone to do, never jev's. */
+    /** Break a machine: yours alone to do, never Jev's. */
     breakIt: (device: Device) => void;
   };
 }
@@ -710,7 +710,7 @@ export function Machine({ ctx, hands, landed, interact }: MachineProps) {
   const assigned = assignCups(ctx);
   const drinkOf = (a?: ActiveStep): Drink | undefined => (a?.cupId ? drinks.find((d) => d.id === assigned.get(a.cupId!)) : undefined);
 
-  /** jev's hands are white, yours the accent. */
+  /** Jev's hands are white, yours the accent. */
   const handsState = (h: HandsView): PartState => (h.who === 'you' ? 'yours' : 'hands');
   const pfHands = hands.find((h) => h.part === 'portafilter');
   const stateOf = (d: Device): PartState => {
@@ -1346,7 +1346,7 @@ export function Machine({ ctx, hands, landed, interact }: MachineProps) {
       })}
 
       {/* Working the bar by hand: each spot is a button over its part, doing
-          what jev could do there. The part lights up under the pointer; a
+          what Jev could do there. The part lights up under the pointer; a
           label says what a click does, or why it would do nothing. */}
       {interact
         ? [

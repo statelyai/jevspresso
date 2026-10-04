@@ -4,7 +4,7 @@ import { jevClient } from '../lib/jev';
 import type { BarContext, BarEvent } from '../lib/types';
 import { espressoBarMachine } from './espressoBar';
 
-/** The barista's jev agent: decides on the bar whenever it changes, at a readable pace. */
+/** The barista's Jev agent: decides on the bar whenever it changes, at a readable pace. */
 export function createBaristaAgent(client: JevClient) {
   return createJevLogic<BarEvent, BarContext>({ ...barista, client, loops: baristaLoops, interval: baristaInterval, keep: 60 });
 }

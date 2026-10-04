@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { forgetKey, loadKey, saveKey } from '../lib/key';
 
-const REPO = 'https://github.com/davidkpiano/jevspresso';
+const REPO = 'https://github.com/statelyai/jevspresso';
 
 /**
- * The jev key in use: the server's, or your own from this browser. `key` is
+ * The Jev key in use: the server's, or your own from this browser. `key` is
  * `undefined` until the page is in the browser, `null` when there is none.
  */
 export function useJevKey(serverHasKey: boolean) {
@@ -19,7 +19,7 @@ export function useJevKey(serverHasKey: boolean) {
   };
 }
 
-/** No jev key on the server or in this browser: run it yourself, or bring your own key. */
+/** No Jev key on the server or in this browser: run it yourself, or bring your own key. */
 export function NeedsKey({ onKey }: { onKey: (key: string) => void }) {
   const [value, setValue] = useState('');
   return (
@@ -27,10 +27,10 @@ export function NeedsKey({ onKey }: { onKey: (key: string) => void }) {
       <div className="flex w-full max-w-md flex-col gap-5 rounded-2xl border border-[#3a3936] bg-[#1d1d1b] p-6 text-[#faf9f5] shadow-[0_24px_64px_rgba(0,0,0,0.5)]">
         <div className="flex flex-col gap-2">
           <h2 id="needs-key" className="text-lg font-semibold">
-            jev needs a key
+            Jev needs a key
           </h2>
           <p className="text-[14px] text-[#a8a49c]">
-            jev makes every move behind this bar, and asks a model each time. Run Jevspresso yourself with your own key, or use
+            Jev makes every move behind this bar, and asks a model each time. Run Jevspresso yourself with your own key, or use
             your TypeSafe key here.
           </p>
         </div>
@@ -41,7 +41,7 @@ export function NeedsKey({ onKey }: { onKey: (key: string) => void }) {
           className="flex h-11 items-center justify-center gap-2 rounded-lg border border-[#3a3936] text-sm text-[#faf9f5] hover:border-[#6b6862]"
         >
           Run it locally
-          <span className="text-[#a8a49c]">github.com/davidkpiano/jevspresso</span>
+          <span className="text-[#a8a49c]">github.com/statelyai/jevspresso</span>
         </a>
         <form
           className="flex flex-col gap-2"
@@ -73,7 +73,7 @@ export function NeedsKey({ onKey }: { onKey: (key: string) => void }) {
             </button>
           </div>
           <p className="text-[12px] text-[#6b6862]">
-            Saved in this browser only. It goes along with each jev request through this app&apos;s server, which uses it for that
+            Saved in this browser only. It goes along with each Jev request through this app&apos;s server, which uses it for that
             call and keeps nothing. Forget it any time from the header.
           </p>
         </form>
@@ -81,4 +81,3 @@ export function NeedsKey({ onKey }: { onKey: (key: string) => void }) {
     </div>
   );
 }
-

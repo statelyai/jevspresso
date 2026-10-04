@@ -16,11 +16,11 @@ export interface JevLoop {
   /**
    * - `cycle`: the same request keeps coming back; the actor returns to the
    *   same state again and again, and every lap is another request.
-   * - `idle`: jev keeps being asked, but nothing it chooses is sent.
+   * - `idle`: Jev keeps being asked, but nothing it chooses is sent.
    * - `repeat`: the same run of moves (by event type) is sent again and
    *   again, though the state moves on each time (a shot pulled into the
    *   same cup, lap after lap). It may be fine (three espressos are three laps), so it is news
-   *   for jev, not a stop.
+   *   for Jev, not a stop.
    */
   kind: 'cycle' | 'idle' | 'repeat';
   /** Occurrences of the repeated request (`cycle`) or run (`repeat`), or length of the streak (`idle`). */
@@ -90,7 +90,7 @@ export function detectLoop(
       kind: 'idle',
       count: streak,
       chosen: asked.slice(0, streak).reverse().map(chosenId),
-      message: `${streak} decision${streak === 1 ? '' : 's'} in a row sent nothing: jev keeps being asked, but nothing it chooses changes the actor`,
+      message: `${streak} decision${streak === 1 ? '' : 's'} in a row sent nothing: Jev keeps being asked, but nothing it chooses changes the actor`,
     };
   }
   return null;

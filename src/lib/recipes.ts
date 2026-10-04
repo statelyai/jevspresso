@@ -150,7 +150,7 @@ export function additionLabel(a: Addition): string {
   }
 }
 
-/** Human-readable synonyms, used by the mock parser and by jev's criteria. */
+/** Human-readable synonyms, used by the mock parser and by Jev's criteria. */
 export const DRINK_ALIASES: Record<DrinkId, string[]> = {
   espresso: ['espresso', 'shot', 'doppio', 'ristretto'],
   americano: ['americano', 'long black'],

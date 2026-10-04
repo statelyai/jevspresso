@@ -348,12 +348,12 @@ export function obstacleOf(ctx: Bar, drink: Drink, assigned = assignCups(ctx)): 
   return obstaclesOf(ctx, drink, assigned)[0] ?? null;
 }
 
-/* ---------------------------------------------------------- what jev sees --- */
+/* ---------------------------------------------------------- what Jev sees --- */
 
 const SPOT_NAME: Record<CupSpot, string> = { tray: 'the drip tray', front: 'the front of the counter' };
 const DEVICE_NAME: Record<Device, string> = { grinder: 'grinder', groupHead: 'group head', steamWand: 'steam wand' };
 
-/** An obstacle, as jev reads it: the fact, not what to do about it. */
+/** An obstacle, as Jev reads it: the fact, not what to do about it. */
 function obstacleText(ctx: Bar, o: Obstacle, assigned: Map<string, string>): string {
   if (o.kind === 'short') return `out of ${o.ingredient}`;
   if (o.kind === 'broken') return `the ${DEVICE_NAME[o.device]} is broken`;
@@ -392,7 +392,7 @@ function nextFor(ctx: Bar, drink: Drink, assigned: Map<string, string>): string 
 }
 
 /**
- * The state jev is asked to reason over. Compact, no functions, no ids it can't
+ * The state Jev is asked to reason over. Compact, no functions, no ids it can't
  * use. The queue is longest waiting first. There is no time in it: the bar's
  * states say what is running, and a move's lookahead (which follows the
  * delays the move starts) says what it comes to once done.
