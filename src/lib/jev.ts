@@ -55,7 +55,7 @@ export function parseOrder(text: string): Promise<ParsedOrder> {
 }
 
 /** Which agent is asking: the barista's requests carry extra questions. */
-type AgentKind = 'barista' | 'router';
+type AgentKind = 'barista' | 'router' | 'light';
 
 const askJev = createServerFn({ method: 'POST' })
   .validator((input: { request: JevRequest; apiKey?: string }) => input)

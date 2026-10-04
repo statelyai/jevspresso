@@ -32,7 +32,7 @@ function DownloadIcon() {
 }
 
 /** A key, struck out with an x: take your key out of this browser. */
-function ForgetKeyIcon() {
+export function ForgetKeyIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="5" cy="8.5" r="2.75" />

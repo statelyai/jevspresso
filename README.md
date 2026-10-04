@@ -71,6 +71,8 @@ actor.send({ type: 'user.request', text: 'time to sleep' });              // →
 
 `client` sends Jev's request to the TypeSafe SDK's `systemOne()` on your server, so the API key stays there. [`src/lib/jev.ts`](src/lib/jev.ts) is the bar's client.
 
+Try it live at `/light` ([`src/machines/light.ts`](src/machines/light.ts)): the lamp there is a switch and a bulb, as a real one is, and you can break the bulb. Ask for light with the bulb broken and the switch on, and Jev replaces the bulb. It is never told about bulbs: it sees whether the room is `lit`, and replacing the bulb is the move that makes it so.
+
 ## How it works
 
 <picture>
@@ -81,6 +83,7 @@ actor.send({ type: 'user.request', text: 'time to sleep' });              // →
 - **The bar** ([`src/machines/espressoBar.ts`](src/machines/espressoBar.ts)) is one parallel machine: order intake, the grinder, espresso machine and steam wand, one portafilter, one milk pitcher, and each barista's hands. It models physics, not recipes. Mistakes are possible; recipes are data the cups are compared against.
 - **The barista** is a `createJevLogic` agent invoked at the top of the bar. Whenever the bar changes, it offers Jev every `barista.*` event that `can()` accepts, each described in the machine's own words plus what it would change (computed with the pure `transition()`). Jev picks one, and the agent sends it if the bar still accepts it.
 - **Orders** are parsed by one Jev call that answers a set of closed questions about the text (which drinks, how many, which milk). Unclear orders go to a router agent that asks the customer to confirm.
+- **`/light`** is the smallest example: a lamp with your requests in its context, and Jev invoked at its top.
 - **`/eval`** runs scenarios (rushes, breakdowns, sabotage) against real Jev and reports how many orders were served correctly and what it cost.
 
 ## Resources
