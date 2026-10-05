@@ -9,11 +9,21 @@
  * the cappuccino have?" cannot tell two cappuccinos apart, and an "almond"
  * meant for one drink leaks into every other drink's answer.
  *
- * A phrase may also only add a detail to drinks ordered before it: "two caps,
- * one almond and one whole", "a latte and a mocha, both large". Each phrase
- * after the first is asked whether it does; if so, its milk, size, decaf and
- * iced go to as many of the cups before it as it covers, instead of making a
- * new drink.
+ * A phrase may order a drink of its own, or only add a detail to drinks from
+ * earlier phrases: "two caps, one almond and one whole", "a latte and a mocha,
+ * both large", "the latte iced". Which it does, and to which drinks, Jev
+ * chooses from options the code lists: a new drink, each earlier phrase, all
+ * of them, or none. It is the bar's idea again: code lists what is possible,
+ * Jev picks. So the split may cut a drink in two, as long as the piece comes
+ * after the drink ("a cap, with almond milk"): Jev puts it back. A piece that
+ * comes first is lost ("a large, iced latte"), and two drinks in one phrase
+ * are one drink.
+ *
+ * Jev's answer to what a phrase does is a ranking, not only a pick. The code
+ * takes the best reading that agrees with Jev's other answers about the
+ * phrase: "a large latte" is not a detail of "a small latte" (the sizes
+ * differ), so it is one more drink. When that is not Jev's first pick, the
+ * order is read back.
  */
 import { DRINK_ALIASES, DRINK_IDS, RECIPES } from './recipes';
 import type {
@@ -42,6 +52,9 @@ export const MAX_PHRASES = 8;
 /** The answer for a phrase that orders no drink. */
 export const NO_DRINK = 'none';
 
+/** What a phrase is about, besides an earlier phrase (`p1`, `p2`, …): a drink of its own, every drink before it, or none. */
+export const ABOUT = { new: 'new', all: 'all', none: 'none' } as const;
+
 /** Answer shapes live in `types.ts`; re-exported here for convenience. */
 export type { AnyAnswer, Answers, ChoiceAnswer, NoulAnswer, ScoreAnswer } from './types';
 
@@ -55,13 +68,13 @@ export function noulConfidence(p: number): number {
 
 /**
  * The phrases an order may name one drink each in: split on commas,
- * semicolons, "&", "and", "plus" and "also". Naive on purpose: "two caps, one
- * almond and one whole" becomes three phrases, and only the first names a
- * drink.
+ * semicolons, "&", "and", "plus", "also" and "then". Naive on purpose: "two
+ * caps, one almond and one whole" becomes three phrases, and only the first
+ * names a drink.
  */
 export function splitPhrases(text: string): string[] {
   const parts = text
-    .split(/\s*(?:[,;&]|\band\b|\bplus\b|\balso\b)\s*/i)
+    .split(/\s*(?:[,;&]|\band\b|\bplus\b|\balso\b|\bthen\b)\s*/i)
     .map((p) => p.trim())
     .filter(Boolean);
   return (parts.length ? parts : [text.trim()]).slice(0, MAX_PHRASES);
@@ -74,6 +87,8 @@ export const phraseKey = (i: number) => `p${i + 1}`;
 const at = (i: number) => `\`phrases.${phraseKey(i)}\``;
 
 export const qId = {
+  /** Asked of every phrase but the first: a drink of its own, or which earlier drinks it adds a detail to. */
+  about: (i: number) => `${phraseKey(i)}_about`,
   drink: (i: number) => `${phraseKey(i)}_drink`,
   qty: (i: number) => `${phraseKey(i)}_qty`,
   milk: (i: number) => `${phraseKey(i)}_milk`,
@@ -82,8 +97,6 @@ export const qId = {
   sizeStated: (i: number) => `${phraseKey(i)}_size_stated`,
   decaf: (i: number) => `${phraseKey(i)}_decaf`,
   iced: (i: number) => `${phraseKey(i)}_iced`,
-  /** Asked of every phrase but the first: does it only add a detail to an earlier drink? */
-  detail: (i: number) => `${phraseKey(i)}_detail`,
   intent: 'intent',
 };
 
@@ -97,10 +110,24 @@ function drinkCriteria(): Record<string, string> {
   return criteria;
 }
 
+/** What the i-th phrase may do: order one more drink, add a detail to an earlier phrase's drinks or to every drink before it, or neither. */
+function aboutCriteria(i: number): Record<string, string> {
+  const criteria: Record<string, string> = {
+    [ABOUT.new]:
+      'Orders one more drink, as in "a mocha" or "another flat white", even when an earlier phrase ordered the same kind of drink',
+  };
+  for (let k = 0; k < i; k++) criteria[phraseKey(k)] = `Only adds a detail to the drinks ordered in ${at(k)}`;
+  // After one phrase, "every drink before it" is the same answer as `p1`, and would split Jev's vote.
+  if (i > 1) criteria[ABOUT.all] = 'Only adds a detail to every drink ordered before it, as in "both decaf" or "all of them small"';
+  criteria[ABOUT.none] = 'Neither: it is not part of the order, as in "thanks" or "to go"';
+  return criteria;
+}
+
 /**
- * One Jev call, function-calling-cookbook style: per phrase, which drink it
- * orders and every argument of that drink as a closed-set question. All of
- * them are answered in parallel over the same state.
+ * One Jev call, function-calling-cookbook style: per phrase, what it is
+ * about, which drink it orders, and every argument of that drink as a
+ * closed-set question. All of them are answered in parallel over the same
+ * state.
  */
 export function buildParseQuestions(phraseCount: number): Record<string, unknown> {
   const questions: Record<string, unknown> = {
@@ -117,6 +144,13 @@ export function buildParseQuestions(phraseCount: number): Record<string, unknown
   };
   const drinks = drinkCriteria();
   for (let i = 0; i < phraseCount; i++) {
+    if (i > 0) {
+      questions[qId.about(i)] = {
+        type: 'choice',
+        instructions: `What does ${at(i)} do? It may order one more drink, or only add a detail (a milk, a size, decaf or iced) to drinks an earlier phrase ordered, as in "the second one decaf", "make it small" or "the mocha with oat milk".`,
+        criteria: aboutCriteria(i),
+      };
+    }
     questions[qId.drink(i)] = {
       type: 'choice',
       instructions: `Which drink from the menu does ${at(i)} order?`,
@@ -160,16 +194,6 @@ export function buildParseQuestions(phraseCount: number): Record<string, unknown
       type: 'noul',
       instructions: `Does ${at(i)} ask for it iced?`,
     };
-    if (i > 0) {
-      questions[qId.detail(i)] = {
-        type: 'noul',
-        instructions: `Does ${at(i)} only add a detail (a milk, a size, decaf or iced) to a drink ordered in an earlier phrase, rather than order a drink of its own?`,
-        criteria: {
-          true: 'It names no drink of its own and describes some of a drink ordered before it, as in "one with oat milk" or "make it large"',
-          false: 'It orders a drink of its own, or is not about a drink at all',
-        },
-      };
-    }
   }
   return questions;
 }
@@ -198,31 +222,47 @@ function asNoul(a: AnyAnswer | undefined): number {
 function asChoice(a: AnyAnswer | undefined): ChoiceAnswer | undefined {
   return a && a.type === 'choice' ? a : undefined;
 }
+const isDrink = (choice: string | undefined): choice is DrinkId => !!choice && (DRINK_IDS as string[]).includes(choice);
 
 /** What a phrase says about its drink, modifiers only. */
 type Mods = Pick<ParsedOrderItem, 'milk' | 'size' | 'decaf' | 'iced'>;
 
-/** One cup of the order: the phrase that ordered it, and `detailed` once a detail phrase has been applied to it. */
+/** One cup of the order, and whether a detail has picked it out from the others of its phrase yet. */
 interface Cup {
   drink: DrinkId;
   mods: Mods;
-  phrase: number;
   detailed: boolean;
 }
+
+/** Both are stated, and they differ: "almond", then "whole" for the same cup. */
+const clash = <T>(a: T | undefined, b: T | undefined) => a !== undefined && b !== undefined && a !== b;
 
 /** Does a phrase state any modifier at all? */
 const statesSomething = (m: Mods) => m.milk !== undefined || m.size !== undefined || m.decaf || m.iced;
 
+/** One way to read a phrase: the cups it orders or the cups it changes, and the confidences it relies on. */
+interface Reading {
+  make?: Cup[];
+  change?: Cup[];
+  mods: Mods;
+  /** It changes some of its drink's cups, not all ("one almond"): they are picked out from the rest. */
+  picksOut: boolean;
+  used: number[];
+}
+
 /**
- * Compose the typed order from the flat answer map. Each phrase that orders a
- * drink adds its cups; each detail phrase after it changes the cups before it
- * ("two caps, one almond and one whole" is one cap with almond and one with
- * whole; "a latte and a mocha, both large" makes both large).
+ * Compose the typed order from the flat answer map. A phrase that orders a
+ * drink makes its cups. A phrase that adds a detail applies it to the cups of
+ * the phrase it is about, the ones no detail has picked out yet first ("two
+ * caps, one almond and one whole" is one cap with almond and one with whole),
+ * or to every cup so far ("both large").
  *
- * Confidence is the minimum over every judgment we actually relied on — a
- * single shaky answer makes the whole order shaky, which is what routes it to
- * the clarify state. A detail that covers more cups than there are before it
- * makes the order unsure, so it is read back rather than guessed.
+ * What a phrase does is Jev's best-ranked reading that agrees with its other
+ * answers about the phrase (see `read`). Confidence is the minimum over every
+ * judgment we actually relied on — a single shaky answer makes the whole
+ * order shaky, which is what routes it to the clarify state. A reading that
+ * is not Jev's first pick, or a phrase no reading fits, makes the order
+ * unsure, so it is read back rather than guessed.
  */
 export function answersToParsedOrder(
   answers: Answers,
@@ -234,73 +274,107 @@ export function answersToParsedOrder(
   const intent = (intentAnswer?.choice ?? 'order') as Intent;
   if (intentAnswer) used.push(intentAnswer.confidence);
 
-  /** Modifiers a phrase states; unstated milk and size stay undefined. */
-  const modsOf = (i: number): Mods => {
+  /** Modifiers a phrase states, and the confidences behind them; unstated milk and size stay undefined. */
+  const modsOf = (i: number): [Mods, number[]] => {
+    const confidences: number[] = [];
+    const stated = <T>(id: string, statedId: string): T | undefined => {
+      const answer = asChoice(answers[id]);
+      if (!answer || asNoul(answers[statedId]) <= 0.5) return undefined;
+      confidences.push(answer.confidence);
+      return answer.choice as T;
+    };
     const mods: Mods = {
-      milk: undefined,
-      size: undefined,
+      milk: stated<MilkType>(qId.milk(i), qId.milkStated(i)),
+      size: stated<Size>(qId.size(i), qId.sizeStated(i)),
       decaf: asNoul(answers[qId.decaf(i)]) > 0.5,
       iced: asNoul(answers[qId.iced(i)]) > 0.5,
     };
-    const milkAnswer = asChoice(answers[qId.milk(i)]);
-    if (asNoul(answers[qId.milkStated(i)]) > 0.5 && milkAnswer) {
-      mods.milk = milkAnswer.choice as MilkType;
-      used.push(milkAnswer.confidence);
-    }
-    const sizeAnswer = asChoice(answers[qId.size(i)]);
-    if (asNoul(answers[qId.sizeStated(i)]) > 0.5 && sizeAnswer) {
-      mods.size = sizeAnswer.choice as Size;
-      used.push(sizeAnswer.confidence);
-    }
-    return mods;
+    return [mods, confidences];
   };
-  const qtyOf = (i: number): number => {
-    const qtyAnswer = asChoice(answers[qId.qty(i)]);
-    if (qtyAnswer) used.push(qtyAnswer.confidence);
-    return Math.min(3, Math.max(1, Number(qtyAnswer?.choice ?? '1') || 1));
+  /** How many drinks a phrase gives, and the confidence behind it. */
+  const qtyOf = (i: number): [number, number[]] => {
+    const answer = asChoice(answers[qId.qty(i)]);
+    return [Math.min(3, Math.max(1, Number(answer?.choice ?? '1') || 1)), answer ? [answer.confidence] : []];
   };
 
+  /** Every cup, in the order the phrases made them. */
   const cups: Cup[] = [];
-  for (let i = 0; i < phraseCount; i++) {
+  /** The cups each phrase is about: the ones it ordered, or the ones it added a detail to. */
+  const cupsOf: Cup[][] = [];
+
+  /** What phrase i may do, Jev's pick first and the rest by probability. The first phrase has no "about" question: its drink answer decides. */
+  const rankingOf = (i: number): { about: string; confidence?: number }[] => {
+    const answer = i > 0 ? asChoice(answers[qId.about(i)]) : undefined;
+    if (!answer) return [{ about: isDrink(asChoice(answers[qId.drink(i)])?.choice) ? ABOUT.new : ABOUT.none }];
+    const rest = Object.entries(answer.probabilities)
+      .filter(([about]) => about !== answer.choice)
+      .sort((a, b) => b[1] - a[1]);
+    return [{ about: answer.choice, confidence: answer.confidence }, ...rest.map(([about]) => ({ about }))];
+  };
+
+  /** Phrase i read as `about`, or undefined if that reading disagrees with Jev's other answers about the phrase. */
+  const read = (i: number, about: string): Reading | undefined => {
     const drinkAnswer = asChoice(answers[qId.drink(i)]);
     const drink = drinkAnswer?.choice;
-    const isDrink = !!drink && (DRINK_IDS as string[]).includes(drink);
+    const [mods, modsUsed] = modsOf(i);
+    const [qty, qtyUsed] = qtyOf(i);
 
-    if (i > 0) {
-      // A detail: Jev says so, or the phrase names no drink but does state a modifier ("one whole").
-      const detail = asNoul(answers[qId.detail(i)]);
-      const mods = modsOf(i);
-      const byJev = detail > 0.5;
-      const byShape = !isDrink && statesSomething(mods);
-      if (byJev || byShape) {
-        used.push(byJev ? noulConfidence(detail) : (drinkAnswer?.confidence ?? 0));
-        // The cups it can cover: those no detail has covered yet, the latest drink's first, each drink's in order.
-        const open = cups
-          .filter((cup) => !cup.detailed)
-          .sort((a, b) => b.phrase - a.phrase || cups.indexOf(a) - cups.indexOf(b));
-        // How many it covers ("one almond", "both large") matters only when it could cover more than one.
-        let left = open.length > 1 ? qtyOf(i) : 1;
-        for (const cup of open) {
-          if (left === 0) break;
-          cup.mods = {
-            milk: mods.milk ?? cup.mods.milk,
-            size: mods.size ?? cup.mods.size,
-            decaf: mods.decaf || cup.mods.decaf,
-            iced: mods.iced || cup.mods.iced,
-          };
-          cup.detailed = true;
-          left--;
-        }
-        if (left > 0) used.push(0); // it covers more cups than were ordered: ask
-        continue;
-      }
+    if (about === ABOUT.new) {
+      if (!isDrink(drink)) return undefined; // no drink to order
+      const make = Array.from({ length: qty }, () => ({ drink, mods: { ...mods }, detailed: false }));
+      return { make, mods, picksOut: false, used: [drinkAnswer!.confidence, ...qtyUsed, ...modsUsed] };
+    }
+    if (about === ABOUT.none) {
+      if (isDrink(drink) || statesSomething(mods)) return undefined; // it orders or asks for something after all
+      return { make: [], mods, picksOut: false, used: drinkAnswer ? [drinkAnswer.confidence] : [] };
     }
 
-    if (drinkAnswer) used.push(drinkAnswer.confidence);
-    if (!isDrink) continue;
-    const qty = qtyOf(i);
-    const mods = modsOf(i);
-    for (let n = 0; n < qty; n++) cups.push({ drink: drink as DrinkId, mods: { ...mods }, phrase: i, detailed: false });
+    // A detail: on every cup so far, or on the cups of the earlier phrase it is about.
+    const k = /^p\d+$/.test(about) ? Number(about.slice(1)) - 1 : -1;
+    const target = about === ABOUT.all ? cups : k >= 0 && k < i ? cupsOf[k] : [];
+    if (target.length === 0 || !statesSomething(mods)) return undefined; // nothing to add it to, or nothing to add
+    if (isDrink(drink) && !target.some((cup) => cup.drink === drink)) return undefined; // it names another drink
+    // How many it covers ("one almond", "two of them") matters only when it could cover more than one.
+    const counted = about !== ABOUT.all && target.length > 1;
+    const covers = counted ? qty : target.length;
+    if (covers > target.length) return undefined; // more cups than there are
+    // Cups no detail has picked out yet go first, so "one almond and one whole" lands on two cups.
+    const change = [...target.filter((cup) => !cup.detailed), ...target.filter((cup) => cup.detailed)].slice(0, covers);
+    if (change.some((cup) => clash(mods.milk, cup.mods.milk) || clash(mods.size, cup.mods.size))) return undefined; // it contradicts a cup
+    return { change, mods, picksOut: covers < target.length, used: [...(counted ? qtyUsed : []), ...modsUsed] };
+  };
+
+  for (let i = 0; i < phraseCount; i++) {
+    cupsOf[i] = [];
+    let reading: Reading | undefined;
+    for (const [rank, option] of rankingOf(i).entries()) {
+      reading = read(i, option.about);
+      if (!reading) continue;
+      // Jev's own pick counts at its confidence; a later one means the pick disagreed with Jev's other answers: ask.
+      if (rank > 0) used.push(0);
+      else if (option.confidence !== undefined) used.push(option.confidence);
+      break;
+    }
+    if (!reading) {
+      used.push(0); // no reading fits all of Jev's answers about this phrase: ask
+      continue;
+    }
+    used.push(...reading.used);
+    if (reading.make) {
+      cupsOf[i] = reading.make;
+      cups.push(...reading.make);
+    }
+    for (const cup of reading.change ?? []) {
+      const { mods } = reading;
+      cup.mods = {
+        milk: mods.milk ?? cup.mods.milk,
+        size: mods.size ?? cup.mods.size,
+        decaf: mods.decaf || cup.mods.decaf,
+        iced: mods.iced || cup.mods.iced,
+      };
+      if (reading.picksOut) cup.detailed = true;
+      cupsOf[i].push(cup);
+    }
   }
 
   // Identical cups next to each other become one item with a quantity.

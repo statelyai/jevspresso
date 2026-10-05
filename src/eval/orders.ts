@@ -40,6 +40,7 @@ export const ORDERS: OrderCase[] = [
     note: 'same drink twice, different milks (read back as "2x espresso (almond), 2x cappuccino (whole)")',
   },
   { text: 'a small latte and a large latte', cups: ['latte size=small', 'latte size=large'] },
+  { text: 'an oat latte and a soy latte', cups: ['latte milk=oat', 'latte milk=soy'], note: 'the same drink again, not a detail of the first' },
 
   // Detail phrases: they add to a drink ordered before them.
   {
@@ -63,6 +64,18 @@ export const ORDERS: OrderCase[] = [
     cups: ['latte size=large', 'mocha size=large'],
     note: 'a detail covering more than one cup reaches back to earlier drinks',
   },
+  {
+    text: 'a latte and a mocha, the latte iced',
+    cups: ['latte iced', 'mocha'],
+    note: 'a detail that names its drink goes on that drink, not the latest one',
+  },
+  {
+    text: 'two lattes and two mochas, all iced',
+    cups: ['latte iced', 'latte iced', 'mocha iced', 'mocha iced'],
+    note: 'a detail on every drink, more cups than the quantity question counts to',
+  },
+  { text: 'a latte then a mocha', cups: ['latte', 'mocha'], note: 'two drinks with no comma or "and" between them' },
+  { text: 'a flat white, please', cups: ['flat_white'], note: 'a phrase that is not part of the order' },
 
   // Not orders.
   { text: "what's the wifi password?", intent: 'question', cups: [] },

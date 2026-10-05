@@ -20,7 +20,7 @@ cp .env.template .env   # set TYPESAFE_API_KEY
 pnpm dev                # http://localhost:3000
 ```
 
-Without a key, the page asks for one. `pnpm test` runs without a key, against a mock Jev.
+Without a key, the page asks for one. `pnpm test` runs without a key, against a mock Jev. `pnpm test:live` runs the order parser against real Jev, on the orders in [`src/eval/orders.ts`](src/eval/orders.ts).
 
 ## XState + Jev in brief
 

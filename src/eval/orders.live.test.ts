@@ -1,21 +1,21 @@
 /**
- * The order parser against real Jev, on the orders in `orders.ts`. Skipped
- * unless TYPESAFE_API_KEY is set (in the environment or in `.env`), so
- * `pnpm test` stays offline. Run it on its own:
- *
- *     pnpm vitest run orders.live
+ * The order parser against real Jev, on the orders in `orders.ts`. It runs
+ * only as `pnpm test:live` (vitest's `--mode live`), with TYPESAFE_API_KEY
+ * set in the environment or in `.env`; `pnpm test` stays offline even with a
+ * key in `.env`.
  *
  * Each case makes one Jev call, the same request `parseOrder` in
  * `lib/jev.ts` sends.
  */
 import { TypeSafeClient } from '@typesafe-ai/sdk';
 import { loadEnv } from 'vite';
-import { describe, expect, it } from 'vitest';
-import { answersToParsedOrder, parseRequest, qId, type Answers } from '../lib/jev-core';
+import { afterAll, describe, expect, it } from 'vitest';
+import { answersToParsedOrder, parseRequest, phraseKey, type Answers, type AnyAnswer } from '../lib/jev-core';
 import type { ParsedOrder } from '../lib/types';
 import { ORDERS } from './orders';
 
-const apiKey = process.env.TYPESAFE_API_KEY || loadEnv('test', process.cwd(), '').TYPESAFE_API_KEY;
+const live = import.meta.env.MODE === 'live';
+const apiKey = live ? process.env.TYPESAFE_API_KEY || loadEnv('live', process.cwd(), '').TYPESAFE_API_KEY : undefined;
 
 /** The parse request `parseOrder` in `lib/jev.ts` sends, and its answers mapped to an order. */
 async function parse(typesafe: TypeSafeClient, text: string): Promise<{ order: ParsedOrder; phrases: string[] }> {
@@ -26,22 +26,25 @@ async function parse(typesafe: TypeSafeClient, text: string): Promise<{ order: P
   return { order, phrases };
 }
 
-/** What Jev answered for each phrase, one line each: shown when a case fails. */
+/**
+ * What Jev answered for each phrase, one line each: shown when a case fails.
+ * Every answer whose id starts with the phrase's key, so it follows the
+ * questions in `jev-core` as they change.
+ */
 function perPhrase(phrases: string[], answers: Answers): string {
-  const p = (id: string) => {
-    const a = answers[id];
-    if (!a) return '-';
+  const show = (a: AnyAnswer) => {
     if (a.type === 'noul') return a.noul.toFixed(2);
     if (a.type === 'choice') return `${a.choice} ${(a.probabilities[a.choice] ?? 0).toFixed(2)} (conf ${a.confidence.toFixed(2)})`;
     return String(a.score);
   };
   return phrases
-    .map(
-      (text, i) =>
-        `  p${i + 1} "${text}": drink ${p(qId.drink(i))}; detail ${i > 0 ? p(qId.detail(i)) : 'n/a'}; qty ${p(qId.qty(i))}; ` +
-        `milk ${p(qId.milk(i))}, stated ${p(qId.milkStated(i))}; size ${p(qId.size(i))}, stated ${p(qId.sizeStated(i))}; ` +
-        `decaf ${p(qId.decaf(i))}; iced ${p(qId.iced(i))}`,
-    )
+    .map((text, i) => {
+      const key = `${phraseKey(i)}_`;
+      const said = Object.entries(answers)
+        .filter(([id]) => id.startsWith(key))
+        .map(([id, a]) => `${id.slice(key.length)} ${show(a)}`);
+      return `  ${phraseKey(i)} "${text}": ${said.join('; ')}`;
+    })
     .join('\n');
 }
 
@@ -66,9 +69,16 @@ describe.skipIf(!apiKey)('orders against real Jev', () => {
   let client: TypeSafeClient | undefined;
   const typesafe = () => (client ??= new TypeSafeClient({ apiKey, timeout: 30_000 }));
 
+  // The app reads an order back below 0.5 (`clarifying`), right or not: listed here, not failed.
+  const readBack: string[] = [];
+  afterAll(() => {
+    if (readBack.length) console.log(`Read back (confidence < 0.5), ${readBack.length} of ${ORDERS.length}:\n${readBack.join('\n')}`);
+  });
+
   it.each(ORDERS.map((o) => [o.text, o] as const))('%s', async (_, o) => {
     const { order, phrases } = await parse(typesafe(), o.text);
     const got = cups(order);
+    if (order.intent === 'order' && order.confidence < 0.5) readBack.push(`  ${order.confidence.toFixed(2)}  ${o.text}`);
     const why =
       `got [${got.join(', ')}], intent ${order.intent}, confidence ${order.confidence}${o.note ? ` (${o.note})` : ''}\n` +
       perPhrase(phrases, order.raw);
