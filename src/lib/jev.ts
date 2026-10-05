@@ -10,7 +10,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { TypeSafeClient } from '@typesafe-ai/sdk';
 import type { JevClient, JevRequest, JevResponse } from '@xstate/jev';
 import { baristaQuestions } from './barista';
-import { answersToParsedOrder, buildParseQuestions, type Answers } from './jev-core';
+import { answersToParsedOrder, parseRequest, type Answers } from './jev-core';
 import { userKey } from './key';
 import { logged } from './jevLog';
 import type { BarSnapshot, ParsedOrder } from './types';
@@ -37,22 +37,19 @@ async function ask(apiKey: string | undefined, state: unknown, questions: Record
   return result.answers as unknown as Answers;
 }
 
-const parseOrderFn = createServerFn({ method: 'POST' })
-  .validator((input: { text: string; apiKey?: string }) => input)
-  .handler(async ({ data: { text, apiKey } }): Promise<ParsedOrder> => {
-    const started = Date.now();
-    const answers = await ask(
-      apiKey,
-      { customer_said: text, menu: 'espresso, americano, latte, cappuccino, flat white, cortado, macchiato, café breve, mocha, hot chocolate' },
-      buildParseQuestions(),
-    );
-    return answersToParsedOrder(answers, { latencyMs: Date.now() - started });
-  });
-
-/** Parse what the customer said into an order, with your key if you gave one. */
-export function parseOrder(text: string): Promise<ParsedOrder> {
-  return parseOrderFn({ data: { text, apiKey: userKey() ?? undefined } });
+/**
+ * Parse what the customer said into an order, with your key if you gave one.
+ * The request is built here and sent through `askJev` like the agents' are,
+ * so it is logged with them (see `jevLog`).
+ */
+export async function parseOrder(text: string): Promise<ParsedOrder> {
+  const { phrases, state, questions } = parseRequest(text);
+  const started = Date.now();
+  const { answers } = await sendParse({ state, questions: questions as JevRequest['questions'] });
+  return answersToParsedOrder(answers as unknown as Answers, phrases.length, { latencyMs: Date.now() - started });
 }
+
+const sendParse = logged('parser', (request) => askJev({ data: { request, apiKey: userKey() ?? undefined } }));
 
 /** Which agent is asking: the barista's requests carry extra questions. */
 type AgentKind = 'barista' | 'router' | 'light';
