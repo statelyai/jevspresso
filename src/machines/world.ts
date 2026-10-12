@@ -75,6 +75,8 @@ export interface WorldContext {
   clarifying: ModelId[];
   /** Every time a café asked, in order. */
   clarifications: Clarification[];
+  /** When each café served each drink, in world time: the bar itself holds no time. */
+  servedAt: Record<string, Record<string, number>>;
 }
 
 export interface WorldInput {
@@ -123,6 +125,10 @@ export const worldMachine = setup({
       /** Set an ingredient in every café, from the panel. */
       SET_STOCK: types<{ ingredient: Ingredient; amount: number }>(),
       SET_SPEED: types<{ speed: number }>(),
+      /** Break a part in every café, by hand. */
+      BREAK: types<{ device: Device }>(),
+      /** Every café back to how it opened, and the day back to its start. */
+      RESET: types<void>(),
     },
   },
   context: ({ input, spawn }) => {
@@ -138,6 +144,7 @@ export const worldMachine = setup({
       intake: Object.fromEntries(input.models.map((model) => [model, 'ready' as Intake])),
       clarifying: [],
       clarifications: [],
+      servedAt: Object.fromEntries(input.models.map((model) => [model, {}])),
     };
   },
   entry: ({ context }, enq) => {
@@ -176,7 +183,12 @@ export const worldMachine = setup({
       if (clarifying.length && !context.clarifying.length) enq(() => context.clock.pause());
       if (!clarifying.length && context.clarifying.length) enq(() => context.clock.resume());
 
-      return { context: { queues, intake, clarifying, clarifications } };
+      const served = cafe.getSnapshot().context.drinks.filter((d) => d.status === 'served' && !(d.id in context.servedAt[event.model]));
+      const servedAt = served.length
+        ? { ...context.servedAt, [event.model]: { ...context.servedAt[event.model], ...Object.fromEntries(served.map((d) => [d.id, context.clock.now()])) } }
+        : context.servedAt;
+
+      return { context: { queues, intake, clarifying, clarifications, servedAt } };
     },
     SET_BREAK_PROB: ({ context, event }) => ({ context: { breakProb: { ...context.breakProb, [event.device]: event.prob } } }),
     SET_EMPTY_PROB: ({ event }) => ({ context: { emptyProb: event.prob } }),
@@ -185,6 +197,26 @@ export const worldMachine = setup({
     },
     SET_SPEED: ({ context, event }, enq) => {
       for (const cafe of Object.values(context.cafes)) enq.sendTo(cafe, event);
+    },
+    BREAK: ({ context, event }, enq) => {
+      for (const cafe of Object.values(context.cafes)) enq.sendTo(cafe, event);
+    },
+    RESET: ({ context }, enq) => {
+      for (const cafe of Object.values(context.cafes)) enq.sendTo(cafe, { type: 'RESET' });
+      if (context.clarifying.length) enq(() => context.clock.resume());
+      const each = <T>(value: () => T) => Object.fromEntries(Object.keys(context.cafes).map((model) => [model, value()]));
+      return {
+        target: '.mayhem',
+        reenter: true,
+        context: {
+          rng: context.seed,
+          queues: each(() => []),
+          intake: each(() => 'ready' as Intake),
+          clarifying: [],
+          clarifications: [],
+          servedAt: each(() => ({})),
+        },
+      };
     },
   },
   initial: 'mayhem',

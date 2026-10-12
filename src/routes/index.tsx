@@ -3,7 +3,7 @@ import { useMachine, useSelector } from '@xstate/react';
 import { useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { JevLoop } from '@xstate/jev';
-import type { ActorRefFrom, AnyActor, EventFromLogic } from 'xstate';
+import type { ActorRefFrom, AnyActor, EventFromLogic, SnapshotFrom } from 'xstate';
 import { DecisionCard, DecisionHistory } from '../components/DecisionCard';
 import { Header } from '../components/Header';
 import { InspectorPane } from '../components/InspectorPane';
@@ -147,8 +147,6 @@ function Bar({ onForgetKey }: { onForgetKey?: () => void }) {
   const agentRef = snapshot.children.barista as ActorRefFrom<BaristaAgent> | undefined;
   const agent = useSelector(agentRef, (s) => s);
   const ctx = barOf(snapshot);
-  const state: BaristaState =
-    agent?.value === 'paused' ? 'paused' : agent?.value === 'deciding' ? 'thinking' : ctx.hands.jev ? 'working' : 'watching';
   return (
     <BarView
       can={(move) => snapshot.can({ ...move, by: 'you' })}
@@ -156,19 +154,8 @@ function Bar({ onForgetKey }: { onForgetKey?: () => void }) {
       onPace={(pace) => agentRef?.send({ type: 'jev.settle', ms: PACE_SETTLE[pace] })}
       // The context plus its regions' states: the portafilter, the pitcher, the equipment.
       ctx={ctx}
-      intake={{
-        clarifying: snapshot.matches({ intake: 'clarifying' }),
-        routing: snapshot.matches({ intake: { clarifying: 'routing' } }),
-        parsing: snapshot.matches({ intake: 'parsing' }),
-      }}
-      barista={{
-        state,
-        decisions: (agent?.context.decisions ?? []).map(toBarDecision),
-        loop: agent?.context.loop ?? null,
-        error: agent?.context.error ?? null,
-        pace: agent?.context.settle ? 0.5 : 1,
-        nextDecisionAt: agent?.context.nextAt ?? 0,
-      }}
+      intake={intakeOf(snapshot)}
+      barista={baristaOf(agent, ctx)}
       send={send}
       inspect={actorRef}
       // When each running delay started and is due, from the actor system.
@@ -179,6 +166,27 @@ function Bar({ onForgetKey }: { onForgetKey?: () => void }) {
 }
 
 type BaristaState = 'watching' | 'thinking' | 'working' | 'paused';
+
+/** Where the bar is with an order: reading it, asking the customer about it, or routing their reply. */
+export function intakeOf(snapshot: { matches(...args: any[]): boolean }): BarViewProps['intake'] {
+  return {
+    clarifying: snapshot.matches({ intake: 'clarifying' }),
+    routing: snapshot.matches({ intake: { clarifying: 'routing' } }),
+    parsing: snapshot.matches({ intake: 'parsing' }),
+  };
+}
+
+/** The barista as the page shows it, from its agent's snapshot and the bar. */
+export function baristaOf(agent: SnapshotFrom<BaristaAgent> | undefined, ctx: Bar): BarViewProps['barista'] {
+  return {
+    state: agent?.value === 'paused' ? 'paused' : agent?.value === 'deciding' ? 'thinking' : ctx.hands.jev ? 'working' : 'watching',
+    decisions: (agent?.context.decisions ?? []).map(toBarDecision),
+    loop: agent?.context.loop ?? null,
+    error: agent?.context.error ?? null,
+    pace: agent?.context.settle ? 0.5 : 1,
+    nextDecisionAt: agent?.context.nextAt ?? 0,
+  };
+}
 
 const SIDE_TABS = ['History', 'Ingredients', 'Chaos'] as const;
 type SideTab = (typeof SIDE_TABS)[number];
@@ -223,12 +231,16 @@ export interface BarViewProps {
   inspect?: AnyActor;
   /** The delays the bar's actor system is running (see `useOnScreen`). */
   timers?: () => Record<string, Timer>;
+  /** The bar's clock: the wall clock, or the world's when comparing. */
+  now?: () => number;
+  /** Inside another page (comparing cafés): fill the space given, not the screen. */
+  embedded?: boolean;
 }
 
 /** The whole screen, from the bar's state. */
-export function BarView({ ctx: bar, intake, barista, send, inspect, timers, can, onPause, onPace, onForgetKey }: BarViewProps) {
+export function BarView({ ctx: bar, intake, barista, send, inspect, timers, now, embedded, can, onPause, onPace, onForgetKey }: BarViewProps) {
   // The bar with the page's clock: when each running step started and is due.
-  const ctx = useOnScreen(bar, timers);
+  const ctx = useOnScreen(bar, timers, now);
   const [text, setText] = useState('a cap with almond milk and an espresso');
   const [tab, setTab] = useState<SideTab>('Ingredients');
   // The inspector mounts on first open and stays mounted, so its session survives hiding it.
@@ -296,7 +308,7 @@ export function BarView({ ctx: bar, intake, barista, send, inspect, timers, can,
           : '';
 
   return (
-    <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[#141413] text-[#faf9f5] lg:flex-row">
+    <div className={`flex ${embedded ? 'min-h-0 flex-1' : 'h-screen min-h-screen'} flex-col overflow-hidden bg-[#141413] text-[#faf9f5] lg:flex-row`}>
       {/* A fixed grid: header, stage, orders. Nothing that happens inside a row changes another row's size. */}
       <div className="@container grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto]">
         <Header

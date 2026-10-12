@@ -143,6 +143,29 @@ describe('orders', () => {
   });
 });
 
+describe('by hand', () => {
+  it('breaks a part in every café', async () => {
+    const w = world({ jev: parser(), kev: parser() });
+    w.actor.send({ type: 'BREAK', device: 'steamWand' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w.cafe('jev').value).toMatchObject({ equipment: { steamWand: 'broken' } });
+    expect(w.cafe('kev').value).toMatchObject({ equipment: { steamWand: 'broken' } });
+  });
+
+  it('starts the day over: every café as it opened, and the same mayhem again', async () => {
+    const w = world({ jev: parser(), kev: parser() });
+    w.actor.send({ type: 'order.submit', text: 'a latte' });
+    w.actor.send({ type: 'BREAK', device: 'grinder' });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(w.actor.getSnapshot().context.rng).not.toBe(1);
+    w.actor.send({ type: 'RESET' });
+    await vi.advanceTimersByTimeAsync(10);
+    expect(w.cafe('jev').context.drinks).toEqual([]);
+    expect(w.cafe('kev').value).toMatchObject({ equipment: { grinder: 'ok' } });
+    expect(w.actor.getSnapshot().context.rng).toBe(1);
+  });
+});
+
 describe('onClock', () => {
   it('lands an answer as long after asking as it took, in world time', async () => {
     const clock = new WorldClock();
