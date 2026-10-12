@@ -40,20 +40,40 @@ async function systemOne(client: TypeSafeClient, state: unknown, questions: Reco
 
 let kevClient: TypeSafeClient | null = null;
 
-/** Clef on Workers AI: Jev's request and answers, the answers wrapped in `result`. */
-async function askClef(model: 'clef' | 'clef-flash', state: unknown, questions: Record<string, unknown>): Promise<Answers> {
+type ClefModel = 'clef' | 'clef-flash' | 'clef-omni';
+
+/** Clef takes at most this many questions in one request. */
+const CLEF_MAX_QUESTIONS = 64;
+
+/**
+ * Clef on Workers AI: Jev's request and answers. A request with more questions
+ * than Clef takes (an order's parse has 81) goes as several at once, over the
+ * same state, and their answers are put back together.
+ */
+async function askClef(model: ClefModel, state: unknown, questions: Record<string, unknown>): Promise<Answers> {
   const { CLOUDFLARE_ACCOUNT_ID: account, CLOUDFLARE_API_TOKEN: token } = process.env;
   if (!account || !token) throw new Error('No Clef key: set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.');
-  const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/@cf/cloudflare/${model}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, state, questions }),
-    signal: AbortSignal.timeout(30_000),
-  });
-  const payload = (await response.json()) as { result?: { answers?: Answers }; errors?: { message?: string }[] };
-  if (!response.ok) throw new Error(payload.errors?.[0]?.message || `Clef returned ${response.status}`);
-  if (!payload.result?.answers) throw new Error('Clef returned no answers');
-  return payload.result.answers;
+  const entries = Object.entries(questions);
+  const chunks = Array.from({ length: Math.ceil(entries.length / CLEF_MAX_QUESTIONS) }, (_, i) =>
+    Object.fromEntries(entries.slice(i * CLEF_MAX_QUESTIONS, (i + 1) * CLEF_MAX_QUESTIONS)),
+  );
+  const answers = await Promise.all(
+    chunks.map(async (chunk) => {
+      const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/@cf/cloudflare/${model}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, state, questions: chunk }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      // The REST API wraps what the model returns in `result`; taken either way.
+      const payload = (await response.json()) as { result?: { answers?: Answers }; answers?: Answers; errors?: { message?: string }[] };
+      if (!response.ok) throw new Error(payload.errors?.[0]?.message || `Clef returned ${response.status}`);
+      const got = payload.result?.answers ?? payload.answers;
+      if (!got) throw new Error('Clef returned no answers');
+      return got;
+    }),
+  );
+  return Object.assign({}, ...answers);
 }
 
 /** How each model is reached. All of them take Jev's request shape. */
@@ -67,6 +87,7 @@ const PROVIDERS: Record<ModelId, Ask> = {
   },
   clef: (state, questions) => askClef('clef', state, questions),
   'clef-flash': (state, questions) => askClef('clef-flash', state, questions),
+  'clef-omni': (state, questions) => askClef('clef-omni', state, questions),
   // In limited preview, and its request format is not published yet.
   openai: async () => {
     throw new Error('The OpenAI Decisions API is not available yet.');
@@ -80,6 +101,7 @@ export const modelsAvailable = createServerFn({ method: 'GET' }).handler(
     kev: Boolean(process.env.KEV_BASE_URL),
     clef: Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN),
     'clef-flash': Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN),
+    'clef-omni': Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN),
     openai: false,
   }),
 );
