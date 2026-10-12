@@ -164,6 +164,21 @@ describe('by hand', () => {
     expect(w.cafe('kev').value).toMatchObject({ equipment: { grinder: 'ok' } });
     expect(w.actor.getSnapshot().context.rng).toBe(1);
   });
+
+  it('resets a café that is still parsing so it can accept the next order', async () => {
+    const w = world({ jev: parser(0.99, 2000) });
+    w.actor.send({ type: 'order.submit', text: 'a latte' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w.cafe('jev').matches({ intake: 'parsing' })).toBe(true);
+
+    w.actor.send({ type: 'RESET' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w.cafe('jev').matches({ intake: 'idle' })).toBe(true);
+
+    w.actor.send({ type: 'order.submit', text: 'a mocha' });
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(w.cafe('jev').context.drinks.map((drink) => drink.drink)).toEqual(['mocha']);
+  });
 });
 
 describe('onClock', () => {

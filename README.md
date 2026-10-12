@@ -86,6 +86,21 @@ Try it live at `/light` ([`src/machines/light.ts`](src/machines/light.ts)): the 
 - **`/light`** is the smallest example: a lamp with your requests in its context, and Jev invoked at its top.
 - **`/eval`** runs scenarios (rushes, breakdowns, sabotage) against real Jev and reports how many orders were served correctly and what it cost.
 
+## Compare decision models
+
+Open `/compare` to run one café per configured decision model. Every café receives the same orders, mayhem, stock changes, speed, and resets at the same simulated time; only the model making decisions differs. Add `?seed=<number>` to replay the same day.
+
+<!-- decision-model providers and their environment requirements from src/lib/jev.ts and src/lib/models.ts -->
+
+| Model | Configuration |
+| --- | --- |
+| Jev | `TYPESAFE_API_KEY`, or enter a key in the page |
+| Kev | `KEV_BASE_URL`; optional `KEV_API_KEY` |
+| Clef, Clef Flash, Clef Omni | `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` |
+| OpenAI Decisions | Not available; API access and request format are still unpublished |
+
+Unavailable models remain visible as disabled tabs explaining what they need. Copy [`.env.template`](.env.template) to `.env` for the supported variables.
+
 ## Resources
 
 - [`@xstate/jev`](packages/jev/README.md): options, `createJevLogic`, caching, loop detection, the client

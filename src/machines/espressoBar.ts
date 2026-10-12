@@ -601,6 +601,7 @@ export const espressoBarMachine = setup({
     /* ---------------------------------------------------------- intake --- */
     intake: {
       initial: 'idle',
+      on: { 'bar.reset': { target: '.idle', reenter: true } },
       states: {
         idle: {
           on: {

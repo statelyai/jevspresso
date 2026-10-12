@@ -60,7 +60,15 @@ function World({ models, seed, onForgetKey }: { models: ModelId[]; seed: number;
   return (
     <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[#141413] text-[#faf9f5]">
       <CafeTabs world={world} models={models} tab={tab} onTab={setTab} seed={seed} />
-      <Cafe key={tab} model={tab} world={world} clock={clock} onForgetKey={onForgetKey} />
+      <div
+        key={tab}
+        id={`cafe-panel-${tab}`}
+        role="tabpanel"
+        aria-labelledby={`cafe-tab-${tab}`}
+        className="flex min-h-0 flex-1"
+      >
+        <Cafe model={tab} world={world} clock={clock} onForgetKey={onForgetKey} />
+      </div>
     </div>
   );
 }
@@ -126,7 +134,9 @@ function CafeTab({ world, model, selected, onSelect }: { world: WorldRef; model:
     <button
       type="button"
       role="tab"
+      id={`cafe-tab-${model}`}
       aria-selected={selected}
+      aria-controls={`cafe-panel-${model}`}
       onClick={onSelect}
       className={`flex shrink-0 flex-col items-start gap-0.5 rounded-t-lg border-b-2 px-3.5 py-2 text-left ${
         selected ? 'border-[#d97757] bg-[#1d1d1b]' : 'border-transparent hover:bg-[#1a1a18]'
