@@ -8,14 +8,14 @@ import { logClient, type JevClient, type JevLogEntry } from '@xstate/jev';
 /** How many requests are kept: the most recent. */
 const MAX = 500;
 
-export type BarLogEntry = JevLogEntry & { agent: string };
+export type BarLogEntry = JevLogEntry & { agent: string; model: string };
 
 const entries: BarLogEntry[] = [];
 
-/** A client whose requests go in the log, as `agent`'s. */
-export function logged(agent: string, client: JevClient): JevClient {
+/** A client whose requests go in the log, as `agent`'s, by `model`. */
+export function logged(agent: string, client: JevClient, model = 'jev'): JevClient {
   return logClient(client, (entry) => {
-    entries.push({ agent, ...entry });
+    entries.push({ agent, model, ...entry });
     if (entries.length > MAX) entries.shift();
   });
 }

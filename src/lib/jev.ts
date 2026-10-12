@@ -1,10 +1,11 @@
 /**
- * Server-side Jev wrapper: TanStack Start server functions, and the SDK
- * client is only constructed inside them. The key comes from the environment
- * (`TYPESAFE_API_KEY`), in development too, and then never reaches the
- * browser. Without it the bar is closed (`jevAvailable`), unless you give a
- * key of your own: it stays in your browser (`lib/key.ts`) and comes along
- * with each request, used for that one call and never kept here.
+ * Server-side decision models: TanStack Start server functions, and every
+ * provider is only called inside them. Keys come from the environment
+ * (`TYPESAFE_API_KEY` for Jev, and see `PROVIDERS` for the rest), in
+ * development too, and then never reach the browser. Without Jev's, the bar
+ * is closed (`jevAvailable`), unless you give a key of your own: it stays in
+ * your browser (`lib/key.ts`) and comes along with each Jev request, used for
+ * that one call and never kept here.
  */
 import { createServerFn } from '@tanstack/react-start';
 import { TypeSafeClient } from '@typesafe-ai/sdk';
@@ -13,6 +14,7 @@ import { baristaQuestions } from './barista';
 import { answersToParsedOrder, buildParseQuestions, type Answers } from './jev-core';
 import { userKey } from './key';
 import { logged } from './jevLog';
+import type { ModelId } from './models';
 import type { BarSnapshot, ParsedOrder } from './types';
 
 /** Is Jev configured? The page checks before opening the bar. */
@@ -27,55 +29,93 @@ function clientFor(apiKey: string | undefined): TypeSafeClient {
   return new TypeSafeClient({ apiKey, timeout: 30_000 });
 }
 
-async function ask(apiKey: string | undefined, state: unknown, questions: Record<string, unknown>): Promise<Answers> {
-  // The SDK's question types are structurally identical to what we build here;
-  // the cast keeps the dynamic (per-request) criteria maps out of the generics.
-  const result = await clientFor(apiKey).systemOne({
-    state: state as never,
-    questions: questions as never,
-  });
+type Ask = (state: unknown, questions: Record<string, unknown>, apiKey?: string) => Promise<Answers>;
+
+// The SDK's question types are structurally identical to what we build here;
+// the casts keep the dynamic (per-request) criteria maps out of the generics.
+async function systemOne(client: TypeSafeClient, state: unknown, questions: Record<string, unknown>): Promise<Answers> {
+  const result = await client.systemOne({ state: state as never, questions: questions as never });
   return result.answers as unknown as Answers;
 }
 
-const parseOrderFn = createServerFn({ method: 'POST' })
-  .validator((input: { text: string; apiKey?: string }) => input)
-  .handler(async ({ data: { text, apiKey } }): Promise<ParsedOrder> => {
-    const started = Date.now();
-    const answers = await ask(
-      apiKey,
-      { customer_said: text, menu: 'espresso, americano, latte, cappuccino, flat white, cortado, macchiato, café breve, mocha, hot chocolate' },
-      buildParseQuestions(),
-    );
-    return answersToParsedOrder(answers, { latencyMs: Date.now() - started });
-  });
+let kevClient: TypeSafeClient | null = null;
 
-/** Parse what the customer said into an order, with your key if you gave one. */
-export function parseOrder(text: string): Promise<ParsedOrder> {
-  return parseOrderFn({ data: { text, apiKey: userKey() ?? undefined } });
+/** Clef on Workers AI: Jev's request and answers, the answers wrapped in `result`. */
+async function askClef(model: 'clef' | 'clef-flash', state: unknown, questions: Record<string, unknown>): Promise<Answers> {
+  const { CLOUDFLARE_ACCOUNT_ID: account, CLOUDFLARE_API_TOKEN: token } = process.env;
+  if (!account || !token) throw new Error('No Clef key: set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.');
+  const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/@cf/cloudflare/${model}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, state, questions }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const payload = (await response.json()) as { result?: { answers?: Answers }; errors?: { message?: string }[] };
+  if (!response.ok) throw new Error(payload.errors?.[0]?.message || `Clef returned ${response.status}`);
+  if (!payload.result?.answers) throw new Error('Clef returned no answers');
+  return payload.result.answers;
 }
 
-/** Which agent is asking: the barista's requests carry extra questions. */
-type AgentKind = 'barista' | 'router' | 'light';
+/** How each model is reached. All of them take Jev's request shape. */
+const PROVIDERS: Record<ModelId, Ask> = {
+  jev: (state, questions, apiKey) => systemOne(clientFor(apiKey), state, questions),
+  // Kev serves TypeSafe's API (`POST /v1/systemone`), so the SDK talks to it as is.
+  kev: (state, questions) => {
+    if (!process.env.KEV_BASE_URL) throw new Error('No Kev server: set KEV_BASE_URL.');
+    kevClient ??= new TypeSafeClient({ baseURL: process.env.KEV_BASE_URL, apiKey: process.env.KEV_API_KEY || 'kev', timeout: 30_000 });
+    return systemOne(kevClient, state, questions);
+  },
+  clef: (state, questions) => askClef('clef', state, questions),
+  'clef-flash': (state, questions) => askClef('clef-flash', state, questions),
+  // In limited preview, and its request format is not published yet.
+  openai: async () => {
+    throw new Error('The OpenAI Decisions API is not available yet.');
+  },
+};
 
-const askJev = createServerFn({ method: 'POST' })
-  .validator((input: { request: JevRequest; apiKey?: string }) => input)
-  .handler(async ({ data: { request, apiKey } }): Promise<JevResponse> => {
-    return { answers: (await ask(apiKey, request.state, request.questions)) as JevResponse['answers'] };
+/** Which models this server can reach. Jev also counts as reachable with a key given on the page. */
+export const modelsAvailable = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<Record<ModelId, boolean>> => ({
+    jev: Boolean(process.env.TYPESAFE_API_KEY),
+    kev: Boolean(process.env.KEV_BASE_URL),
+    clef: Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN),
+    'clef-flash': Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN),
+    openai: false,
+  }),
+);
+
+const askModel = createServerFn({ method: 'POST' })
+  .validator((input: { model: ModelId; request: JevRequest; apiKey?: string }) => input)
+  .handler(async ({ data: { model, request, apiKey } }): Promise<JevResponse> => {
+    return { answers: (await PROVIDERS[model](request.state, request.questions, apiKey)) as JevResponse['answers'] };
   });
 
+/** Which agent is asking: the barista's requests carry extra questions. */
+type AgentKind = 'barista' | 'router' | 'light' | 'parse';
+
 /**
- * The `@xstate/jev` client (the adapter): every request goes through the
- * server function. The barista's adapter also adds its extra questions to
- * each request; they ride along in the same call and do not affect the
- * decision.
+ * The `@xstate/jev` client (the adapter) for one model: every request goes
+ * through the server function. The barista's adapter also adds its extra
+ * questions to each request; they ride along in the same call and do not
+ * affect the decision.
  */
-export function jevClient(kind: AgentKind): JevClient {
+export function decisionClient(kind: AgentKind, model: ModelId = 'jev'): JevClient {
   // Logged as sent, extra questions included (see `jevLog`); the key travels beside the request, never in it.
-  const send = logged(kind, (request) => askJev({ data: { request, apiKey: userKey() ?? undefined } }));
+  const send = logged(kind, (request) => askModel({ data: { model, request, apiKey: userKey() ?? undefined } }), model);
   return (request) =>
     send(
       kind === 'barista'
         ? { ...request, questions: { ...request.questions, ...baristaQuestions(request.state as BarSnapshot) } }
         : request,
     );
+}
+
+/** Parse what the customer said into an order, by a model (Jev unless told otherwise). */
+export async function parseOrder(text: string, client: JevClient = decisionClient('parse')): Promise<ParsedOrder> {
+  const started = Date.now();
+  const { answers } = await client({
+    state: { customer_said: text, menu: 'espresso, americano, latte, cappuccino, flat white, cortado, macchiato, café breve, mocha, hot chocolate' },
+    questions: buildParseQuestions() as JevRequest['questions'],
+  });
+  return { ...answersToParsedOrder(answers as unknown as Answers, { latencyMs: Date.now() - started }), text };
 }

@@ -133,6 +133,8 @@ export interface Drink {
   status: DrinkStatus;
   /** When it was ordered: the time the order came with (`order.submit`'s `at`). */
   orderedAt: number;
+  /** What the customer said, as typed: kept to check the order against later. */
+  orderText?: string;
   /** The cup they were handed: what was in it, and whether it was what they ordered. */
   served?: { cupId: string; contents: Addition[]; spot: CupSpot; slot?: number; correct: boolean };
   note?: string;
@@ -220,6 +222,8 @@ export interface ParsedOrder {
   latencyMs: number;
   /** Raw Jev answers, kept for the decision log. */
   raw: Answers;
+  /** What the customer said, as it was parsed. */
+  text?: string;
 }
 
 /** A barista action Jev may choose: a fully-instantiated event, or the noop. */

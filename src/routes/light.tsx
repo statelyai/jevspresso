@@ -6,7 +6,7 @@ import type { AnyActorRef } from 'xstate';
 import { JevMark } from '../components/JevMark';
 import { ForgetKeyIcon } from '../components/Header';
 import { NeedsKey, useJevKey } from '../components/NeedsKey';
-import { jevAvailable, jevClient } from '../lib/jev';
+import { decisionClient, jevAvailable } from '../lib/jev';
 import { createLightMachine, isLit, type LampValue, type LightEvent } from '../machines/light';
 
 /**
@@ -18,7 +18,7 @@ export const Route = createFileRoute('/light')({
   component: LightPage,
 });
 
-const lightMachine = createLightMachine(jevClient('light'));
+const lightMachine = createLightMachine(decisionClient('light'));
 
 const SUGGESTIONS = ['It’s getting dark in here', 'Too bright, I have a headache', 'I want to read', 'Lights out, time to sleep'];
 

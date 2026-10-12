@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ABLATIONS, ablated } from '../eval/ablations';
 import { runScenario, SCENARIOS, type RunResult } from '../eval/scenarios';
 import { logClient, type JevClient, type JevLogEntry } from '@xstate/jev';
-import { jevClient } from '../lib/jev';
+import { decisionClient } from '../lib/jev';
 import { downloadLog } from '../lib/jevLog';
 import { loadKey } from '../lib/key';
 
@@ -37,7 +37,7 @@ function Eval() {
     setRunning(true);
     setResults({});
     log.current = [];
-    const client = jevClient('barista');
+    const client = decisionClient('barista');
     for (const ablation of ABLATIONS.filter((a) => chosen.has(a.id))) {
       // Every scenario's runs side by side; the ablations one after another.
       const runs = await Promise.all(

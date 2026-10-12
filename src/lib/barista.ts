@@ -19,7 +19,7 @@ export const BACKLOG_LEVELS = ['calm', 'busy', 'slammed'] as const;
 
 /**
  * Extra judgments the barista's Jev adapter adds to every request (see
- * `jevClient` in `lib/jev.ts`). They do not take part in the decision: Jev
+ * `decisionClient` in `lib/jev.ts`). They do not take part in the decision: Jev
  * answers each question on its own. The decision card shows them.
  */
 export function baristaQuestions(bar: BarSnapshot): Record<string, JevQuestion> {

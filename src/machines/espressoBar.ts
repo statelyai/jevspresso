@@ -2,7 +2,7 @@ import { createJevLogic, type JevDecision, type JevLoop } from '@xstate/jev';
 import { createAsyncLogic, createCallbackLogic, setup, types, type AnyActorLogic } from 'xstate';
 import { z } from 'zod';
 import { orderRouter } from '../lib/barista';
-import { jevClient, parseOrder } from '../lib/jev';
+import { decisionClient, parseOrder } from '../lib/jev';
 import {
   CHAOS_LEVELS,
   DEVICES,
@@ -64,7 +64,7 @@ const barista: AnyActorLogic = createCallbackLogic(() => {});
  * decides only when asked). It hands `order.confirm` / `order.cancel` straight
  * back to the bar.
  */
-const orderRouterAgent = createJevLogic<BarEvent, BarContext>({ ...orderRouter, client: jevClient('router'), auto: false });
+const orderRouterAgent = createJevLogic<BarEvent, BarContext>({ ...orderRouter, client: decisionClient('router'), auto: false });
 
 /**
  * Chaos does not know the current probabilities — it just rolls dice every
@@ -120,6 +120,7 @@ function drinksFromOrder(order: ParsedOrder, startNo: number, now: number): Drin
         mods: { ...mods },
         status: 'queued',
         orderedAt: now,
+        orderText: order.text,
       });
       n++;
     }
