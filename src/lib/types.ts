@@ -390,6 +390,8 @@ export interface BarContext {
   breakProb: Record<Device, number>;
   /** When the order being read or clarified came in. */
   pendingAt: number;
+  /** Orders that came in while another was being read or clarified, oldest first: each is read in turn. */
+  orderQueue: { text: string; at: number }[];
   nextDrinkNo: number;
   error: string | null;
 }

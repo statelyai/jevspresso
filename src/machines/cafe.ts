@@ -13,26 +13,26 @@ export type CafeClients = (kind: 'barista' | 'router' | 'parse') => JevClient;
 
 /**
  * A bar where one model does all the deciding: parsing orders, routing the
- * customer's replies, and the barista's moves. It has no chaos of its own;
- * the world sends every café the same mayhem.
+ * customer's replies, and the barista's moves. On a day it has no chaos of
+ * its own (`ownChaos: false`): what breaks, and when, is the day's.
  */
-export function createCafe(clients: CafeClients) {
-  return espressoBarMachine.provide({
+export function createCafe(clients: CafeClients, { ownChaos = true }: { ownChaos?: boolean } = {}) {
+  const cafe = espressoBarMachine.provide({
     actors: {
       barista: createBaristaAgent(clients('barista')),
       orderRouterAgent: createJevLogic<BarEvent, BarContext>({ ...orderRouter, client: clients('router'), auto: false }),
       parseOrderActor: createAsyncLogic<ParsedOrder, { text: string }>({ run: ({ input }) => parseOrder(input.text, clients('parse')) }),
-      chaos: createCallbackLogic(() => {}),
     },
   });
+  return ownChaos ? cafe : cafe.provide({ actors: { chaos: createCallbackLogic(() => {}) } });
 }
 
 export type CafeLogic = ReturnType<typeof createCafe>;
 
 /**
- * A client whose answers land when they would on the world clock: as long
+ * A client whose answers land when they would on a day's clock: as long
  * after asking as they took, with any pause in between not counted. An answer
- * that comes back while the world stands still waits for it to move again.
+ * that comes back while the day stands still waits for it to move again.
  */
 export function onClock(client: JevClient, clock: WorldClock): JevClient {
   return async (request) => {
@@ -45,9 +45,16 @@ export function onClock(client: JevClient, clock: WorldClock): JevClient {
 }
 
 /**
- * The café `model` runs, its answers on the world clock. The router's are
- * not: it is asked while the world stands still, waiting on the customer.
+ * The bar with `model` deciding everything in it. On a day's clock, its
+ * answers land on that clock (see `onClock`), all but the router's: it is
+ * asked while the day stands still, waiting on the customer.
  */
-export function modelCafe(model: ModelId, clock: WorldClock): CafeLogic {
-  return createCafe((kind) => (kind === 'router' ? decisionClient('router', model) : onClock(decisionClient(kind, model), clock)));
+export function modelCafe(model: ModelId, clock?: WorldClock): CafeLogic {
+  return createCafe(
+    (kind) => {
+      const client = decisionClient(kind, model);
+      return clock && kind !== 'router' ? onClock(client, clock) : client;
+    },
+    { ownChaos: !clock },
+  );
 }

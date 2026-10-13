@@ -1,0 +1,18 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`a day > prints what it reads like 1`] = `
+[
+  "I'll have a small americano",
+  "can I get a small latte",
+  "could I grab two cortados?",
+  "can I get a café breve",
+  "hi! two whole milk cappuccinos, thanks",
+  "I'll have a large oat hot chocolate",
+  "hi! a cap and a hot cocoa with soy milk, thanks",
+  "I'll have a cortado",
+  "could I grab a cap?",
+  "a flat white",
+  "I'll have an espresso",
+  "could I grab a cortado with whole milk?",
+]
+`;

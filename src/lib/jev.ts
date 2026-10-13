@@ -2,19 +2,19 @@
  * Server-side decision models: TanStack Start server functions, and every
  * provider is only called inside them. Keys come from the environment
  * (`TYPESAFE_API_KEY` for Jev, and see `PROVIDERS` for the rest), in
- * development too, and then never reach the browser. Without Jev's, the bar
- * is closed (`jevAvailable`), unless you give a key of your own: it stays in
- * your browser (`lib/key.ts`) and comes along with each Jev request, used for
- * that one call and never kept here.
+ * development too, and then never reach the browser. Without them, the bar
+ * is closed, unless you give keys of your own (Jev's, or Clef's): they stay
+ * in your browser (`lib/key.ts`) and come along with that model's requests,
+ * used for that one call and never kept here.
  */
 import { createServerFn } from '@tanstack/react-start';
 import { TypeSafeClient } from '@typesafe-ai/sdk';
 import type { JevClient, JevRequest, JevResponse } from '@xstate/jev';
 import { baristaQuestions } from './barista';
 import { answersToParsedOrder, buildParseQuestions, type Answers } from './jev-core';
-import { userKey } from './key';
+import { userCredentials, type Credentials } from './key';
 import { logged } from './jevLog';
-import type { ModelId } from './models';
+import { modelInfo, type ModelId } from './models';
 import type { BarSnapshot, ParsedOrder } from './types';
 
 /** Is Jev configured? The page checks before opening the bar. */
@@ -29,7 +29,7 @@ function clientFor(apiKey: string | undefined): TypeSafeClient {
   return new TypeSafeClient({ apiKey, timeout: 30_000 });
 }
 
-type Ask = (state: unknown, questions: Record<string, unknown>, apiKey?: string) => Promise<Answers>;
+type Ask = (state: unknown, questions: Record<string, unknown>, credentials?: Credentials) => Promise<Answers>;
 
 // The SDK's question types are structurally identical to what we build here;
 // the casts keep the dynamic (per-request) criteria maps out of the generics.
@@ -50,9 +50,13 @@ const CLEF_MAX_QUESTIONS = 64;
  * than Clef takes (an order's parse has 81) goes as several at once, over the
  * same state, and their answers are put back together.
  */
-async function askClef(model: ClefModel, state: unknown, questions: Record<string, unknown>): Promise<Answers> {
-  const { CLOUDFLARE_ACCOUNT_ID: account, CLOUDFLARE_API_TOKEN: token } = process.env;
-  if (!account || !token) throw new Error('No Clef key: set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.');
+async function askClef(model: ClefModel, state: unknown, questions: Record<string, unknown>, credentials?: Credentials): Promise<Answers> {
+  const fromEnv = process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN;
+  const account = fromEnv ? process.env.CLOUDFLARE_ACCOUNT_ID : credentials?.account;
+  const token = fromEnv ? process.env.CLOUDFLARE_API_TOKEN : credentials?.token;
+  if (!account || !token) throw new Error('No Clef key: set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, or give them on the page.');
+  // It goes into the URL: an account ID, and nothing else.
+  if (!/^[0-9a-f]{32}$/i.test(account)) throw new Error('That is not a Cloudflare account ID (32 hex characters).');
   const entries = Object.entries(questions);
   const chunks = Array.from({ length: Math.ceil(entries.length / CLEF_MAX_QUESTIONS) }, (_, i) =>
     Object.fromEntries(entries.slice(i * CLEF_MAX_QUESTIONS, (i + 1) * CLEF_MAX_QUESTIONS)),
@@ -78,23 +82,23 @@ async function askClef(model: ClefModel, state: unknown, questions: Record<strin
 
 /** How each model is reached. All of them take Jev's request shape. */
 const PROVIDERS: Record<ModelId, Ask> = {
-  jev: (state, questions, apiKey) => systemOne(clientFor(apiKey), state, questions),
+  jev: (state, questions, credentials) => systemOne(clientFor(credentials?.key), state, questions),
   // Kev serves TypeSafe's API (`POST /v1/systemone`), so the SDK talks to it as is.
   kev: (state, questions) => {
     if (!process.env.KEV_BASE_URL) throw new Error('No Kev server: set KEV_BASE_URL.');
     kevClient ??= new TypeSafeClient({ baseURL: process.env.KEV_BASE_URL, apiKey: process.env.KEV_API_KEY || 'kev', timeout: 30_000 });
     return systemOne(kevClient, state, questions);
   },
-  clef: (state, questions) => askClef('clef', state, questions),
-  'clef-flash': (state, questions) => askClef('clef-flash', state, questions),
-  'clef-omni': (state, questions) => askClef('clef-omni', state, questions),
+  clef: (state, questions, credentials) => askClef('clef', state, questions, credentials),
+  'clef-flash': (state, questions, credentials) => askClef('clef-flash', state, questions, credentials),
+  'clef-omni': (state, questions, credentials) => askClef('clef-omni', state, questions, credentials),
   // In limited preview, and its request format is not published yet.
   openai: async () => {
     throw new Error('The OpenAI Decisions API is not available yet.');
   },
 };
 
-/** Which models this server can reach. Jev also counts as reachable with a key given on the page. */
+/** Which models this server can reach with its own keys. Jev and Clef can also take yours, from the page. */
 export const modelsAvailable = createServerFn({ method: 'GET' }).handler(
   async (): Promise<Record<ModelId, boolean>> => ({
     jev: Boolean(process.env.TYPESAFE_API_KEY),
@@ -107,9 +111,9 @@ export const modelsAvailable = createServerFn({ method: 'GET' }).handler(
 );
 
 const askModel = createServerFn({ method: 'POST' })
-  .validator((input: { model: ModelId; request: JevRequest; apiKey?: string }) => input)
-  .handler(async ({ data: { model, request, apiKey } }): Promise<JevResponse> => {
-    return { answers: (await PROVIDERS[model](request.state, request.questions, apiKey)) as JevResponse['answers'] };
+  .validator((input: { model: ModelId; request: JevRequest; credentials?: Credentials }) => input)
+  .handler(async ({ data: { model, request, credentials } }): Promise<JevResponse> => {
+    return { answers: (await PROVIDERS[model](request.state, request.questions, credentials)) as JevResponse['answers'] };
   });
 
 /** Which agent is asking: the barista's requests carry extra questions. */
@@ -122,8 +126,9 @@ type AgentKind = 'barista' | 'router' | 'light' | 'parse';
  * affect the decision.
  */
 export function decisionClient(kind: AgentKind, model: ModelId = 'jev'): JevClient {
-  // Logged as sent, extra questions included (see `jevLog`); the key travels beside the request, never in it.
-  const send = logged(kind, (request) => askModel({ data: { model, request, apiKey: userKey() ?? undefined } }), model);
+  // Logged as sent, extra questions included (see `jevLog`); keys travel beside the request, never in it.
+  const provider = modelInfo(model).provider;
+  const send = logged(kind, (request) => askModel({ data: { model, request, credentials: userCredentials(provider) ?? undefined } }), model);
   return (request) =>
     send(
       kind === 'barista'

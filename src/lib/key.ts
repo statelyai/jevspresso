@@ -1,40 +1,56 @@
 /**
- * A Jev key you paste in, when the server has none of its own. It is kept in
- * this browser only (localStorage), and sent along with each Jev request, which
- * uses it for that one call and keeps nothing (see `lib/jev.ts`).
+ * Keys you paste in, for a model the server has none for: a TypeSafe key for
+ * Jev, a Cloudflare account and token for Clef. Each is kept in this browser
+ * only (localStorage), and sent along with that model's requests, which use
+ * it for that one call and keep nothing (see `lib/jev.ts`).
  */
-const STORAGE = 'jevspresso:typesafe-key';
+import type { Provider } from './models';
 
-let current: string | null = null;
-
-/** The key in use, if you gave one. */
-export function userKey(): string | null {
-  return current;
+export interface Credentials {
+  /** TypeSafe's key. */
+  key?: string;
+  /** Cloudflare's account ID and API token. */
+  account?: string;
+  token?: string;
 }
 
-/** Read it back from this browser, if it was saved here. */
-export function loadKey(): string | null {
+const STORAGE: Record<Provider, string> = {
+  typesafe: 'jevspresso:typesafe-key',
+  cloudflare: 'jevspresso:cloudflare',
+};
+
+const current: Partial<Record<Provider, Credentials>> = {};
+
+/** The keys in use for a provider, if you gave them. */
+export function userCredentials(provider: Provider | undefined): Credentials | null {
+  return (provider && current[provider]) || null;
+}
+
+/** Read them back from this browser, if they were saved here. */
+export function loadCredentials(provider: Provider): Credentials | null {
   try {
-    current = localStorage.getItem(STORAGE);
+    const saved = localStorage.getItem(STORAGE[provider]);
+    // TypeSafe's key has always been kept as it is; the rest as JSON.
+    current[provider] = saved ? (provider === 'typesafe' ? { key: saved } : (JSON.parse(saved) as Credentials)) : undefined;
   } catch {
-    current = null;
+    current[provider] = undefined;
   }
-  return current;
+  return current[provider] ?? null;
 }
 
-export function saveKey(key: string): void {
-  current = key;
+export function saveCredentials(provider: Provider, credentials: Credentials): void {
+  current[provider] = credentials;
   try {
-    localStorage.setItem(STORAGE, key);
+    localStorage.setItem(STORAGE[provider], provider === 'typesafe' ? (credentials.key ?? '') : JSON.stringify(credentials));
   } catch {
-    // Storage blocked: the key still works until the page closes.
+    // Storage blocked: the keys still work until the page closes.
   }
 }
 
-export function forgetKey(): void {
-  current = null;
+export function forgetCredentials(provider: Provider): void {
+  current[provider] = undefined;
   try {
-    localStorage.removeItem(STORAGE);
+    localStorage.removeItem(STORAGE[provider]);
   } catch {
     // Nothing saved to forget.
   }

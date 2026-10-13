@@ -1,8 +1,8 @@
 /**
- * The compare page's clock: wall time that can stand still. It is the world
- * actor's system clock, so every café's timed steps (`after`) and the world's
- * mayhem run on it, and pausing it pauses them all at the same instant.
- * World time is wall time minus every pause so far.
+ * A day's clock: wall time that can stand still. It is the day actor's
+ * system clock, so the bar's timed steps (`after`) and the day's timeline run
+ * on it, and pausing it pauses them all at the same instant. Its time is wall
+ * time minus every pause so far.
  */
 interface Timer {
   fn: () => void;

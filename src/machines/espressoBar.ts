@@ -100,6 +100,7 @@ export function initialContext(): BarContext {
     speed: 1,
     breakProb: { grinder: CHAOS_LEVELS.low, groupHead: CHAOS_LEVELS.low, steamWand: CHAOS_LEVELS.low },
     pendingAt: 0,
+    orderQueue: [],
     nextDrinkNo: 1,
     error: null,
   };
@@ -601,8 +602,20 @@ export const espressoBarMachine = setup({
     /* ---------------------------------------------------------- intake --- */
     intake: {
       initial: 'idle',
+      // Not while idle (its own `order.submit` reads it at once): an order
+      // that comes in while another is being read or clarified waits its turn.
+      on: {
+        'order.submit': ({ context, event }) => ({
+          context: { orderQueue: [...context.orderQueue, { text: event.text, at: event.at }] },
+        }),
+      },
       states: {
         idle: {
+          always: ({ context }: { context: BarContext }) => {
+            const [next, ...rest] = context.orderQueue;
+            if (!next) return;
+            return { target: 'parsing', context: { pendingText: next.text, pendingAt: next.at, orderQueue: rest, error: null } };
+          },
           on: {
             'order.submit': ({ event }) => ({
               target: 'parsing',
