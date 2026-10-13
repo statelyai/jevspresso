@@ -608,6 +608,7 @@ export const espressoBarMachine = setup({
         'order.submit': ({ context, event }) => ({
           context: { orderQueue: [...context.orderQueue, { text: event.text, at: event.at }] },
         }),
+        'bar.reset': { target: '.idle', reenter: true },
       },
       states: {
         idle: {

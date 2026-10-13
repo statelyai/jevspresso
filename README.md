@@ -86,6 +86,27 @@ Try it live at `/light` ([`src/machines/light.ts`](src/machines/light.ts)): the 
 - **`/light`** is the smallest example: a lamp with your requests in its context, and Jev invoked at its top.
 - **`/eval`** runs scenarios (rushes, breakdowns, sabotage) against real Jev and reports how many orders were served correctly and what it cost.
 
+## Other decision models
+
+Jev runs the bar by default. Pick another model in the header, or with `?model=`: every decision (reading orders, routing replies, the barista's moves) goes to it.
+
+<!-- decision-model providers and their environment requirements from src/lib/jev.ts and src/lib/models.ts -->
+
+| Model | `?model=` | Configuration |
+| --- | --- | --- |
+| Jev | `jev` | `TYPESAFE_API_KEY`, or enter a key in the page |
+| Kev | `kev` | `KEV_BASE_URL`; optional `KEV_API_KEY` |
+| Clef, Clef Flash, Clef Omni | `clef`, `clef-flash`, `clef-omni` | `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`, or enter them in the page |
+| OpenAI Decisions | `openai` | Not available; API access and request format are still unpublished |
+
+Copy [`.env.template`](.env.template) to `.env` for the supported variables.
+
+## Days
+
+**Play a day** (or open `?day=<seed>`) to give the bar twelve customers and a few mishaps (parts breaking, ingredients running out), each at a fixed time in bar time. The same seed is the same day, whichever model runs it, so `?day=42&model=clef` and `?day=42` can be compared.
+
+The customers know what they meant: when the bar asks "did you mean…?", they answer yes or no, and say their order again if it was not taken (twice at most). The day's clock stands still while the bar asks. At the end, a scorecard reports orders read right, asks, drinks served and how long people waited, and the model's requests and latency, with a button to play the same day with another model.
+
 ## Resources
 
 - [`@xstate/jev`](packages/jev/README.md): options, `createJevLogic`, caching, loop detection, the client

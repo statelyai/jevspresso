@@ -42,6 +42,16 @@ let kevClient: TypeSafeClient | null = null;
 
 type ClefModel = 'clef' | 'clef-flash' | 'clef-omni';
 
+interface ClefPayload {
+  result?: { response?: { answers?: Answers }; answers?: Answers };
+  answers?: Answers;
+  errors?: { message?: string }[];
+}
+
+export function clefAnswers(payload: ClefPayload): Answers | undefined {
+  return payload.result?.response?.answers ?? payload.result?.answers ?? payload.answers;
+}
+
 /** Clef takes at most this many questions in one request. */
 const CLEF_MAX_QUESTIONS = 64;
 
@@ -70,9 +80,9 @@ async function askClef(model: ClefModel, state: unknown, questions: Record<strin
         signal: AbortSignal.timeout(30_000),
       });
       // The REST API wraps what the model returns in `result`; taken either way.
-      const payload = (await response.json()) as { result?: { answers?: Answers }; answers?: Answers; errors?: { message?: string }[] };
+      const payload = (await response.json()) as ClefPayload;
       if (!response.ok) throw new Error(payload.errors?.[0]?.message || `Clef returned ${response.status}`);
-      const got = payload.result?.answers ?? payload.answers;
+      const got = clefAnswers(payload);
       if (!got) throw new Error('Clef returned no answers');
       return got;
     }),
@@ -98,6 +108,19 @@ const PROVIDERS: Record<ModelId, Ask> = {
   },
 };
 
+interface AskModelInput {
+  model: ModelId;
+  request: JevRequest;
+  credentials?: Credentials;
+}
+
+export function validateAskModelInput(input: AskModelInput): AskModelInput {
+  if (!Object.hasOwn(PROVIDERS, input.model)) {
+    throw new Error(`Unknown model: ${String(input.model)}`);
+  }
+  return input;
+}
+
 /** Which models this server can reach with its own keys. Jev and Clef can also take yours, from the page. */
 export const modelsAvailable = createServerFn({ method: 'GET' }).handler(
   async (): Promise<Record<ModelId, boolean>> => ({
@@ -111,7 +134,7 @@ export const modelsAvailable = createServerFn({ method: 'GET' }).handler(
 );
 
 const askModel = createServerFn({ method: 'POST' })
-  .validator((input: { model: ModelId; request: JevRequest; credentials?: Credentials }) => input)
+  .validator(validateAskModelInput)
   .handler(async ({ data: { model, request, credentials } }): Promise<JevResponse> => {
     return { answers: (await PROVIDERS[model](request.state, request.questions, credentials)) as JevResponse['answers'] };
   });
