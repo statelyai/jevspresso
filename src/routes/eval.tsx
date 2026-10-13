@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ABLATIONS, ablated } from '../eval/ablations';
 import { runScenario, SCENARIOS, type RunResult } from '../eval/scenarios';
 import { logClient, type JevClient, type JevLogEntry } from '@xstate/jev';
-import { jevClient } from '../lib/jev';
+import { decisionClient } from '../lib/jev';
 import { downloadLog } from '../lib/jevLog';
-import { loadKey } from '../lib/key';
+import { loadCredentials } from '../lib/key';
 
 /**
  * The scenarios (`src/eval/scenarios.ts`), run with real Jev, with your key if
@@ -31,13 +31,13 @@ function Eval() {
   const [open, setOpen] = useState<{ ablation: string; scenario: string } | null>(null);
   // Every request of the last run, with what came back, for a download.
   const log = useRef<Array<JevLogEntry & { ablation: string; scenario: string; run: number }>>([]);
-  useEffect(() => void loadKey(), []);
+  useEffect(() => void loadCredentials('typesafe'), []);
 
   const run = async () => {
     setRunning(true);
     setResults({});
     log.current = [];
-    const client = jevClient('barista');
+    const client = decisionClient('barista');
     for (const ablation of ABLATIONS.filter((a) => chosen.has(a.id))) {
       // Every scenario's runs side by side; the ablations one after another.
       const runs = await Promise.all(

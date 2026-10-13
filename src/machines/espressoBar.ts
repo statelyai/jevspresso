@@ -2,7 +2,7 @@ import { createJevLogic, type JevDecision, type JevLoop } from '@xstate/jev';
 import { createAsyncLogic, createCallbackLogic, setup, types, type AnyActorLogic } from 'xstate';
 import { z } from 'zod';
 import { orderRouter } from '../lib/barista';
-import { jevClient, parseOrder } from '../lib/jev';
+import { decisionClient, parseOrder } from '../lib/jev';
 import {
   CHAOS_LEVELS,
   DEVICES,
@@ -64,7 +64,7 @@ const barista: AnyActorLogic = createCallbackLogic(() => {});
  * decides only when asked). It hands `order.confirm` / `order.cancel` straight
  * back to the bar.
  */
-const orderRouterAgent = createJevLogic<BarEvent, BarContext>({ ...orderRouter, client: jevClient('router'), auto: false });
+const orderRouterAgent = createJevLogic<BarEvent, BarContext>({ ...orderRouter, client: decisionClient('router'), auto: false });
 
 /**
  * Chaos does not know the current probabilities — it just rolls dice every
@@ -100,6 +100,7 @@ export function initialContext(): BarContext {
     speed: 1,
     breakProb: { grinder: CHAOS_LEVELS.low, groupHead: CHAOS_LEVELS.low, steamWand: CHAOS_LEVELS.low },
     pendingAt: 0,
+    orderQueue: [],
     nextDrinkNo: 1,
     error: null,
   };
@@ -120,6 +121,7 @@ function drinksFromOrder(order: ParsedOrder, startNo: number, now: number): Drin
         mods: { ...mods },
         status: 'queued',
         orderedAt: now,
+        orderText: order.text,
       });
       n++;
     }
@@ -600,8 +602,21 @@ export const espressoBarMachine = setup({
     /* ---------------------------------------------------------- intake --- */
     intake: {
       initial: 'idle',
+      // Not while idle (its own `order.submit` reads it at once): an order
+      // that comes in while another is being read or clarified waits its turn.
+      on: {
+        'order.submit': ({ context, event }) => ({
+          context: { orderQueue: [...context.orderQueue, { text: event.text, at: event.at }] },
+        }),
+        'bar.reset': { target: '.idle', reenter: true },
+      },
       states: {
         idle: {
+          always: ({ context }: { context: BarContext }) => {
+            const [next, ...rest] = context.orderQueue;
+            if (!next) return;
+            return { target: 'parsing', context: { pendingText: next.text, pendingAt: next.at, orderQueue: rest, error: null } };
+          },
           on: {
             'order.submit': ({ event }) => ({
               target: 'parsing',

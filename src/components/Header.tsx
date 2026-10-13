@@ -1,4 +1,21 @@
+import { MODELS, modelInfo, type ModelId } from '../lib/models';
 import { useSlidingPill } from './motion';
+
+/** Which model runs the bar, from those this page can reach. */
+export interface ModelPick {
+  value: ModelId;
+  /** Can the model run here: the server has its keys, or you can give yours. */
+  usable: (model: ModelId) => boolean;
+  onChange: (model: ModelId) => void;
+}
+
+/** A day under way: its seed, how many of its customers have come in, and what you can do with it. */
+export interface DayBadge {
+  seed: number;
+  arrived: number;
+  customers: number;
+  onLeave: () => void;
+}
 
 export interface HeaderProps {
   text: string;
@@ -16,6 +33,11 @@ export interface HeaderProps {
   onForgetKey?: () => void;
   /** Save Jev's requests and responses so far. */
   onDownloadLog?: () => void;
+  model?: ModelPick;
+  /** Start a day, from a new seed. */
+  onPlayDay?: () => void;
+  /** The day under way: the order box is the customers', not yours. */
+  day?: DayBadge;
 }
 
 const SPEEDS = [1, 5, 10];
@@ -43,15 +65,47 @@ export function ForgetKeyIcon() {
 }
 
 export function Header(props: HeaderProps) {
-  const { text, onText, onSubmit, onRush, replying, speed, onSpeed, onReset, inspectorOpen, onInspector, onForgetKey, onDownloadLog } = props;
+  const { text, onText, onSubmit, onRush, replying, speed, onSpeed, onReset, inspectorOpen, onInspector, onForgetKey, onDownloadLog, model, onPlayDay, day } = props;
   const { barRef, pillRef } = useSlidingPill(Math.max(0, SPEEDS.indexOf(speed)));
 
   return (
-    <header className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3 border-b border-[#2a2a28] px-6 py-3.5 @4xl:h-[72px] @4xl:flex-nowrap">
+    <header className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3 border-b border-[#2a2a28] px-6 py-3.5 @6xl:h-[72px] @6xl:flex-nowrap">
       <h1 className="shrink-0 text-xl font-semibold tracking-[-0.01em]">Jevspresso</h1>
 
+      {model ? (
+        <label className="flex shrink-0 items-center gap-2 text-[13px] text-[#a8a49c]">
+          <span className="sr-only">Model</span>
+          <select
+            value={model.value}
+            onChange={(e) => model.onChange(e.target.value as ModelId)}
+            title={`${modelInfo(model.value).label}, by ${modelInfo(model.value).by}, makes every decision at this bar`}
+            className="h-9 w-[8.5rem] rounded-lg border border-[#3a3936] bg-[#1d1d1b] px-2.5 text-[13px] text-[#faf9f5]"
+          >
+            {MODELS.map((m) => (
+              <option key={m.id} value={m.id} disabled={!model.usable(m.id)}>
+                {m.label}
+                {model.usable(m.id) ? '' : ' (not set up)'}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+
+      {day ? (
+        <div className="order-last flex min-w-0 basis-full items-center gap-3 @6xl:order-none @6xl:basis-auto @6xl:grow">
+          <div className="flex h-11 min-w-0 grow items-center gap-3 rounded-lg border border-[#3a3936] bg-[#1d1d1b] px-3.5 text-[14px]">
+            <span className="shrink-0 font-medium">Day #{day.seed}</span>
+            <span className="tnum min-w-0 truncate text-[#a8a49c]">
+              {day.arrived < day.customers ? `${day.arrived} of ${day.customers} customers in` : `All ${day.customers} customers in · closing`}
+            </span>
+          </div>
+          <button type="button" onClick={day.onLeave} className={`${QUIET} h-11`}>
+            Leave day
+          </button>
+        </div>
+      ) : (
       <form
-        className="order-last flex min-w-0 basis-full gap-2 @4xl:order-none @4xl:basis-auto @4xl:grow"
+        className="order-last flex min-w-0 basis-full gap-2 @6xl:order-none @6xl:basis-auto @6xl:grow"
         onSubmit={(e) => {
           e.preventDefault();
           onSubmit();
@@ -76,8 +130,9 @@ export function Header(props: HeaderProps) {
           Rush
         </button>
       </form>
+      )}
 
-      <div className="ml-auto flex shrink-0 items-center gap-3 @4xl:ml-0">
+      <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3 @6xl:ml-0 @6xl:shrink-0 @6xl:flex-nowrap">
         {/* The pill glides between 1× / 5× / 10×. */}
         <div ref={barRef} className="t-tabs shrink-0 text-xs" role="tablist" aria-label="Simulation speed">
           <span ref={pillRef} className="t-tabs-pill" aria-hidden="true" />
@@ -95,8 +150,18 @@ export function Header(props: HeaderProps) {
             </button>
           ))}
         </div>
+        {onPlayDay ? (
+          <button
+            type="button"
+            onClick={onPlayDay}
+            title="Twelve customers and a few mishaps, the same each time for the same day: try it with another model"
+            className={QUIET}
+          >
+            Play a day
+          </button>
+        ) : null}
         <button type="button" onClick={onReset} className={QUIET}>
-          Reset
+          {day ? 'Restart day' : 'Reset'}
         </button>
         {onDownloadLog ? (
           <button type="button" onClick={onDownloadLog} className={ICON} aria-label="Download Jev's log" title="Download Jev's requests and responses (JSON)">

@@ -1,6 +1,6 @@
 import { createJevLogic, type JevClient } from '@xstate/jev';
 import { barista, baristaInterval, baristaLoops } from '../lib/barista';
-import { jevClient } from '../lib/jev';
+import { decisionClient } from '../lib/jev';
 import type { BarContext, BarEvent } from '../lib/types';
 import { espressoBarMachine } from './espressoBar';
 
@@ -9,7 +9,7 @@ export function createBaristaAgent(client: JevClient) {
   return createJevLogic<BarEvent, BarContext>({ ...barista, client, loops: baristaLoops, interval: baristaInterval, keep: 60 });
 }
 
-export const baristaAgent = createBaristaAgent(jevClient('barista'));
+export const baristaAgent = createBaristaAgent(decisionClient('barista'));
 
 /**
  * The bar with its barista. Wired here, not in `espressoBar.ts`: the barista's

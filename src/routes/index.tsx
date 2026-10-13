@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useMachine, useSelector } from '@xstate/react';
+import { useActorRef, useMachine, useSelector } from '@xstate/react';
 import { useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { JevLoop } from '@xstate/jev';
-import type { ActorRefFrom, AnyActor, EventFromLogic } from 'xstate';
+import type { ActorRefFrom, AnyActor, EventFromLogic, SnapshotFrom } from 'xstate';
 import { DecisionCard, DecisionHistory } from '../components/DecisionCard';
-import { Header } from '../components/Header';
+import { Header, type DayBadge, type ModelPick } from '../components/Header';
 import { InspectorPane } from '../components/InspectorPane';
 import { Chaos, Ingredients } from '../components/Inventory';
 import { JevMark } from '../components/JevMark';
@@ -17,25 +17,68 @@ import { useOnScreen, type Timer } from '../components/useOnScreen';
 import { barOf } from '../lib/legal';
 import type { Bar, BaristaMove, Decision, Device } from '../lib/types';
 import { allHands, cupToken, drinkTag, handsView, type HandsView, type ViewBar } from '../lib/view';
-import { jevAvailable } from '../lib/jev';
+import { modelsAvailable } from '../lib/jev';
 import { downloadLog, jevLog } from '../lib/jevLog';
-import { NeedsKey, useJevKey } from '../components/NeedsKey';
-import { barMachine, type BaristaAgent } from '../machines';
+import { NeedsKey, useModelKey } from '../components/NeedsKey';
+import { Scorecard } from '../components/Scorecard';
+import { DAY } from '../lib/day';
+import { isModelId, modelInfo, type ModelId } from '../lib/models';
+import { dayScore } from '../lib/score';
+import { WorldClock } from '../lib/worldClock';
+import type { barMachine, BaristaAgent } from '../machines';
+import { modelCafe } from '../machines/cafe';
+import { dayMachine } from '../machines/day';
 import { PACE_SETTLE, toBarDecision, type JevPace } from '../lib/barista';
 
-// The bar needs Jev's key: from the environment, or your own, kept in this
-// browser. Without one the bar still shows, under a note that it needs one.
+// The bar, run by a model (`?model=`, Jev unless told otherwise): yours to
+// play with, or a day's (`?day=`), the same day for the same seed. It needs
+// the model's key: from the environment, or your own, kept in this browser.
+// Without one the bar still shows, under a note that it needs one.
 export const Route = createFileRoute('/')({
-  loader: () => jevAvailable(),
+  validateSearch: (search: Record<string, unknown>): { model?: ModelId; day?: number } => ({
+    ...(isModelId(search.model) && search.model !== 'jev' ? { model: search.model } : {}),
+    ...(search.day !== undefined && search.day !== '' && Number.isInteger(Number(search.day)) ? { day: Number(search.day) } : {}),
+  }),
+  loader: () => modelsAvailable(),
   component: Page,
 });
 
+/** A new day's seed: short enough to read out. */
+const newDay = () => Math.floor(Math.random() * 1_000_000);
+
 function Page() {
-  const key = useJevKey(Route.useLoaderData());
+  const available = Route.useLoaderData();
+  const { model = 'jev', day } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const key = useModelKey(model, available[model]);
+  // Bumped to play the same day again: the same URL, a fresh bar.
+  const [run, setRun] = useState(0);
+  const go = (search: { model: ModelId; day?: number }) =>
+    navigate({ search: { ...(search.model === 'jev' ? {} : { model: search.model }), ...(search.day === undefined ? {} : { day: search.day }) } });
+  const pick: ModelPick = {
+    value: model,
+    usable: (m) => available[m] || Boolean(modelInfo(m).provider),
+    onChange: (m) => go({ model: m, day }),
+  };
   return (
     <>
-      <Bar onForgetKey={key.forget} />
-      {key.missing ? <NeedsKey onKey={key.save} /> : null}
+      {day === undefined ? (
+        <Bar key={model} model={model} pick={pick} onPlayDay={() => go({ model, day: newDay() })} onForgetKey={key.forget} />
+      ) : (
+        <DayBar
+          key={`${model}@${day}#${run}`}
+          model={model}
+          seed={day}
+          pick={pick}
+          onRestart={() => setRun((n) => n + 1)}
+          onDay={(m, seed) => (m === model && seed === day ? setRun((n) => n + 1) : go({ model: m, day: seed }))}
+          onLeave={() => go({ model })}
+          onForgetKey={key.forget}
+        />
+      )}
+      {key.missing ? (
+        <NeedsKey key={`needs:${model}`} model={model} onKey={key.save} onCancel={model === 'jev' ? undefined : () => go({ model: 'jev', day })} />
+      ) : null}
     </>
   );
 }
@@ -139,16 +182,15 @@ function PauseButton({ paused, onToggle }: { paused: boolean; onToggle: () => vo
   );
 }
 
-function Bar({ onForgetKey }: { onForgetKey?: () => void }) {
-  const [snapshot, send, actorRef] = useMachine(barMachine);
+function Bar({ model, pick, onPlayDay, onForgetKey }: { model: ModelId; pick: ModelPick; onPlayDay: () => void; onForgetKey?: () => void }) {
+  const [machine] = useState(() => modelCafe(model));
+  const [snapshot, send, actorRef] = useMachine(machine);
   // The barista: a Jev agent invoked at the top of the bar. Its own snapshot
   // says whether it is deciding or paused, with its decisions; what its
   // hands are doing is the bar's.
   const agentRef = snapshot.children.barista as ActorRefFrom<BaristaAgent> | undefined;
   const agent = useSelector(agentRef, (s) => s);
   const ctx = barOf(snapshot);
-  const state: BaristaState =
-    agent?.value === 'paused' ? 'paused' : agent?.value === 'deciding' ? 'thinking' : ctx.hands.jev ? 'working' : 'watching';
   return (
     <BarView
       can={(move) => snapshot.can({ ...move, by: 'you' })}
@@ -156,40 +198,127 @@ function Bar({ onForgetKey }: { onForgetKey?: () => void }) {
       onPace={(pace) => agentRef?.send({ type: 'jev.settle', ms: PACE_SETTLE[pace] })}
       // The context plus its regions' states: the portafilter, the pitcher, the equipment.
       ctx={ctx}
-      intake={{
-        clarifying: snapshot.matches({ intake: 'clarifying' }),
-        routing: snapshot.matches({ intake: { clarifying: 'routing' } }),
-        parsing: snapshot.matches({ intake: 'parsing' }),
-      }}
-      barista={{
-        state,
-        decisions: (agent?.context.decisions ?? []).map(toBarDecision),
-        loop: agent?.context.loop ?? null,
-        error: agent?.context.error ?? null,
-        pace: agent?.context.settle ? 0.5 : 1,
-        nextDecisionAt: agent?.context.nextAt ?? 0,
-      }}
+      intake={intakeOf(snapshot)}
+      barista={baristaOf(agent, ctx)}
       send={send}
       inspect={actorRef}
       // When each running delay started and is due, from the actor system.
       timers={() => actorRef.system.getSnapshot()._scheduledTimers}
+      model={pick}
+      onPlayDay={onPlayDay}
       onForgetKey={onForgetKey}
     />
   );
 }
 
+/**
+ * A day at the bar: the day sends the customers and the mishaps, and the
+ * customers answer the bar's questions. You watch; you can change the speed,
+ * which the day runs by, and start it over.
+ */
+function DayBar({
+  model,
+  seed,
+  pick,
+  onRestart,
+  onDay,
+  onLeave,
+  onForgetKey,
+}: {
+  model: ModelId;
+  seed: number;
+  pick: ModelPick;
+  onRestart: () => void;
+  onDay: (model: ModelId, seed: number) => void;
+  onLeave: () => void;
+  onForgetKey?: () => void;
+}) {
+  const [clock] = useState(() => new WorldClock());
+  const dayRef = useActorRef(dayMachine, { input: { model, seed, clock }, clock });
+  const cafe = useSelector(dayRef, (s) => s.context.cafe);
+  const snapshot = useSelector(cafe, (s) => s);
+  const agent = useSelector(snapshot.children.barista as ActorRefFrom<BaristaAgent> | undefined, (s) => s);
+  const arrived = useSelector(dayRef, (s) => s.context.customers.length);
+  const closed = useSelector(dayRef, (s) => s.matches('closed'));
+  const ctx = barOf(snapshot);
+  // The day's bar is a full actor; its ref is typed as the narrower contract.
+  const actor = cafe as unknown as AnyActor;
+  // The bar is the day's: of what you can do, only the speed and starting over.
+  const send = (event: EventFromLogic<typeof barMachine>) => {
+    if (event.type === 'SET_SPEED') dayRef.send(event);
+    if (event.type === 'RESET') onRestart();
+  };
+  const score = () => {
+    const { customers, servedAt, startedWall } = dayRef.getSnapshot().context;
+    return dayScore(customers, ctx.drinks, servedAt, jevLog().filter((e) => e.model === model && e.at >= startedWall));
+  };
+  return (
+    <>
+      <BarView
+        ctx={ctx}
+        intake={intakeOf(snapshot)}
+        barista={baristaOf(agent, ctx)}
+        send={send}
+        inspect={actor}
+        // Only the bar's delays, not the day's own.
+        timers={() =>
+          Object.fromEntries(
+            Object.entries(actor.system.getSnapshot()._scheduledTimers as Record<string, Timer & { source: unknown }>).filter(([, t]) => t.source === actor),
+          )
+        }
+        now={() => clock.now()}
+        model={pick}
+        day={{ seed, arrived, customers: DAY.orders, onLeave }}
+        onForgetKey={onForgetKey}
+      />
+      {closed ? (
+        <Scorecard
+          model={model}
+          seed={seed}
+          score={score()}
+          usable={pick.usable}
+          onDay={(m) => onDay(m, seed)}
+          onNewDay={() => onDay(model, newDay())}
+          onLeave={onLeave}
+        />
+      ) : null}
+    </>
+  );
+}
+
 type BaristaState = 'watching' | 'thinking' | 'working' | 'paused';
+
+/** Where the bar is with an order: reading it, asking the customer about it, or routing their reply. */
+function intakeOf(snapshot: { matches(...args: any[]): boolean }): BarViewProps['intake'] {
+  return {
+    clarifying: snapshot.matches({ intake: 'clarifying' }),
+    routing: snapshot.matches({ intake: { clarifying: 'routing' } }),
+    parsing: snapshot.matches({ intake: 'parsing' }),
+  };
+}
+
+/** The barista as the page shows it, from its agent's snapshot and the bar. */
+function baristaOf(agent: SnapshotFrom<BaristaAgent> | undefined, ctx: Bar): BarViewProps['barista'] {
+  return {
+    state: agent?.value === 'paused' ? 'paused' : agent?.value === 'deciding' ? 'thinking' : ctx.hands.jev ? 'working' : 'watching',
+    decisions: (agent?.context.decisions ?? []).map(toBarDecision),
+    loop: agent?.context.loop ?? null,
+    error: agent?.context.error ?? null,
+    pace: agent?.context.settle ? 0.5 : 1,
+    nextDecisionAt: agent?.context.nextAt ?? 0,
+  };
+}
 
 const SIDE_TABS = ['History', 'Ingredients', 'Chaos'] as const;
 type SideTab = (typeof SIDE_TABS)[number];
 
 /** Under Jev's decision: its history, the ingredients, and chaos, one at a time. */
-function SideTabs({ tab, onTab, historyCount }: { tab: SideTab; onTab: (tab: SideTab) => void; historyCount: number }) {
-  const { barRef, pillRef } = useSlidingPill(SIDE_TABS.indexOf(tab));
+function SideTabs({ tabs, tab, onTab, historyCount }: { tabs: readonly SideTab[]; tab: SideTab; onTab: (tab: SideTab) => void; historyCount: number }) {
+  const { barRef, pillRef } = useSlidingPill(tabs.indexOf(tab));
   return (
     <div ref={barRef} className="t-tabs self-start text-xs" role="tablist" aria-label="Bar details">
       <span ref={pillRef} className="t-tabs-pill" aria-hidden="true" />
-      {SIDE_TABS.map((t) => (
+      {tabs.map((t) => (
         <button key={t} type="button" className="t-tab" role="tab" aria-selected={tab === t} onClick={() => onTab(t)}>
           {t}
           {t === 'History' && historyCount ? <span className="tnum opacity-60"> {historyCount}</span> : null}
@@ -223,14 +352,24 @@ export interface BarViewProps {
   inspect?: AnyActor;
   /** The delays the bar's actor system is running (see `useOnScreen`). */
   timers?: () => Record<string, Timer>;
+  /** The bar's clock: the wall clock, or the world's when comparing. */
+  now?: () => number;
+  /** Which model runs the bar, to pick another. */
+  model?: ModelPick;
+  /** Start a day. */
+  onPlayDay?: () => void;
+  /** A day under way: the bar is the day's, and only watched. */
+  day?: DayBadge;
 }
 
 /** The whole screen, from the bar's state. */
-export function BarView({ ctx: bar, intake, barista, send, inspect, timers, can, onPause, onPace, onForgetKey }: BarViewProps) {
+export function BarView({ ctx: bar, intake, barista, send, inspect, timers, now, model, onPlayDay, day, can, onPause, onPace, onForgetKey }: BarViewProps) {
   // The bar with the page's clock: when each running step started and is due.
-  const ctx = useOnScreen(bar, timers);
+  const ctx = useOnScreen(bar, timers, now);
   const [text, setText] = useState('a cap with almond milk and an espresso');
-  const [tab, setTab] = useState<SideTab>('Ingredients');
+  const sideTabs: readonly SideTab[] = day ? SIDE_TABS.filter((t) => t !== 'Chaos') : SIDE_TABS;
+  const [chosenTab, setTab] = useState<SideTab>('Ingredients');
+  const tab = sideTabs.includes(chosenTab) ? chosenTab : 'Ingredients';
   // The inspector mounts on first open and stays mounted, so its session survives hiding it.
   const [inspector, setInspector] = useState<'never' | 'open' | 'hidden'>('never');
 
@@ -312,6 +451,9 @@ export function BarView({ ctx: bar, intake, barista, send, inspect, timers, can,
           onDownloadLog={() => downloadLog(jevLog())}
           inspectorOpen={inspector === 'open'}
           onInspector={() => setInspector((v) => (v === 'open' ? 'hidden' : 'open'))}
+          model={model}
+          onPlayDay={onPlayDay}
+          day={day}
         />
 
         <div className="relative grid min-h-0 grid-cols-1 overflow-y-auto @4xl:grid-cols-[minmax(0,1fr)_340px] @4xl:overflow-hidden">
@@ -328,7 +470,8 @@ export function BarView({ ctx: bar, intake, barista, send, inspect, timers, can,
                 ?
               </span>
               <span className="tnum text-[#a8a49c]">{pct(ctx.pendingOrder.confidence)} sure</span>
-              <div className="ml-auto flex gap-2">
+              {/* On a day, the customer answers. */}
+              {day ? null : <div className="ml-auto flex gap-2">
                 <button
                   type="button"
                   onClick={() => send({ type: 'order.confirm' })}
@@ -343,7 +486,7 @@ export function BarView({ ctx: bar, intake, barista, send, inspect, timers, can,
                 >
                   Retype
                 </button>
-              </div>
+              </div>}
             </div>
           ) : null}
           <main className="grid min-h-[420px] min-w-0 grid-rows-[2.25rem_minmax(0,1fr)] gap-2 px-6 pt-4">
@@ -382,14 +525,15 @@ export function BarView({ ctx: bar, intake, barista, send, inspect, timers, can,
               paused={state === 'paused'}
             />
             <div className="flex min-w-0 flex-col gap-4">
-              <SideTabs tab={tab} onTab={setTab} historyCount={Math.max(0, decisions.length - 1)} />
+              {/* On a day, what breaks is the day's: no chaos to set. */}
+              <SideTabs tabs={sideTabs} tab={tab} onTab={setTab} historyCount={Math.max(0, decisions.length - 1)} />
               {tab === 'History' ? (
                 <DecisionHistory decisions={decisions} drinks={ctx.drinks} />
               ) : tab === 'Ingredients' ? (
                 <Ingredients
                   inventory={ctx.inventory}
                   restocking={hands.find((h) => h.ingredient)?.ingredient}
-                  onStock={(ingredient, amount) => send({ type: 'SET_STOCK', ingredient, amount })}
+                  onStock={day ? undefined : (ingredient, amount) => send({ type: 'SET_STOCK', ingredient, amount })}
                 />
               ) : (
                 <Chaos
