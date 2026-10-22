@@ -147,7 +147,7 @@ export const dayMachine = setup({
     },
     'cafe.changed': ({ context }, enq) => {
       const bar = context.cafe.getSnapshot();
-      // Read before any \`matches\`: its type predicates narrow \`bar\` past use.
+      // Read before any `matches`: its type predicates narrow `bar` past use.
       const drinks = bar.context.drinks;
       let customers = context.customers;
       const update = (id: string, f: (c: CustomerRecord) => CustomerRecord) => {

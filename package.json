@@ -14,10 +14,10 @@
     "@tanstack/react-start": "^1.169.3",
     "@typesafe-ai/sdk": "0.7.0",
     "@xstate/jev": "workspace:*",
-    "@xstate/react": "7.0.0-alpha.2",
+    "@xstate/react": "7.0.0-alpha.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "xstate": "6.0.0-alpha.58",
+    "xstate": "6.0.0-alpha.70",
     "zod": "^4.6.7"
   },
   "devDependencies": {

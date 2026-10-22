@@ -159,7 +159,7 @@ export interface JevOptions<TEvent extends EventObject = EventObject, TContext e
 /** `JevOptions` typed from a machine: `const agent = { … } satisfies JevOptionsFor<typeof machine>`. */
 export type JevOptionsFor<TMachine extends AnyStateMachine> = JevOptions<
   EventFromLogic<TMachine>,
-  ContextFrom<TMachine>
+  ContextFrom<TMachine> extends MachineContext ? ContextFrom<TMachine> : MachineContext
 >;
 
 export interface JevDecideOptions<TEvent extends EventObject = EventObject, TContext extends MachineContext = any>

@@ -5,17 +5,23 @@ import type { Bar } from '../lib/types';
 /** How often the page's clock moves on screen: smooth progress, no faster. */
 const FRAME_MS = 100;
 
-/** A delay the actor system is running: when it was scheduled and when it is due. */
+/** A delay the actor system is running: what for, when it was scheduled and when it is due. */
 export interface Timer {
-  id: string;
+  /** A delayed transition's is its event, naming the state that waits (`stateId`). */
+  key: object;
   scheduledAt: number;
   dueAt: number;
+}
+
+/** The state a delayed transition's timer waits in, if it is one. */
+function stateIdOf(timer: Timer): string {
+  return 'event' in timer.key ? String((timer.key.event as { stateId?: unknown }).stateId ?? '') : '';
 }
 
 /**
  * The bar as the page shows it. The machine holds no time: its timed states
  * wait out their delays, and the actor system knows when each was scheduled
- * and is due (`timers`, keyed `xstate.after.<delay>.<state id>`). A running
+ * and is due (`timers`, each keyed by its `xstate.after` event). A running
  * step takes its times from its state's timer. Without one (a restored bar),
  * and for when an order was served, the page notes when it first saw it.
  * Times are the actor system's clock (`now`): the wall clock, or a world's.
@@ -34,7 +40,7 @@ export function useOnScreen(bar: Bar, timers: () => Record<string, Timer> = () =
     return seen.current.get(key)!;
   };
   const running = Object.values(timers());
-  const timerOf = (state: string) => running.find((t) => t.id.endsWith(`.${state}`));
+  const timerOf = (state: string) => running.find((t) => stateIdOf(t).endsWith(`.${state}`));
   const activeSteps = bar.activeSteps.map((s) => {
     const timer = timerOf(s.state);
     const startedAt = timer?.scheduledAt ?? stamp(`step:${s.state}:${s.cupId ?? ''}`);
