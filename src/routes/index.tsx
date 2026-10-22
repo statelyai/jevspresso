@@ -64,10 +64,11 @@ function Page() {
   return (
     <>
       {day === undefined ? (
-        <Bar key={model} model={model} pick={pick} onPlayDay={() => go({ model, day: newDay() })} onForgetKey={key.forget} />
+        // A new key starts the bar over: a fresh barista asks with it at once, and errors from the old one go.
+        <Bar key={`${model}#${key.changes}`} model={model} pick={pick} onPlayDay={() => go({ model, day: newDay() })} onForgetKey={key.forget} />
       ) : (
         <DayBar
-          key={`${model}@${day}#${run}`}
+          key={`${model}@${day}#${run}#${key.changes}`}
           model={model}
           seed={day}
           pick={pick}

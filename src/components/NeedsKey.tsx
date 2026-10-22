@@ -7,13 +7,22 @@ const REPO = 'https://github.com/statelyai/jevspresso';
 /** The keys you gave in this browser: `undefined` until the page is in the browser. */
 export function usePageKeys() {
   const [keys, setKeys] = useState<PageKeys | undefined>(undefined);
+  // Counts your changes (not the first read): what the bar was doing with the old keys is moot.
+  const [changes, setChanges] = useState(0);
   useEffect(() => setKeys(loadKeys()), []);
   return {
     keys,
+    changes,
     /** Whose keys you gave. */
     holders: Object.keys(keys ?? {}) as KeyHolder[],
-    save: (holder: KeyHolder, credentials: Credentials) => setKeys(saveKey(holder, credentials)),
-    forget: () => setKeys(forgetKeys()),
+    save: (holder: KeyHolder, credentials: Credentials) => {
+      setKeys(saveKey(holder, credentials));
+      setChanges((n) => n + 1);
+    },
+    forget: () => {
+      setKeys(forgetKeys());
+      setChanges((n) => n + 1);
+    },
   };
 }
 
