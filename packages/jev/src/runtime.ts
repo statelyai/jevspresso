@@ -99,6 +99,8 @@ export interface JevAgentContext<TEvent extends EventObject = EventObject> {
   loop: JevLoop | null;
   /** Why the last request failed, until one succeeds. */
   error: string | null;
+  /** How many requests in a row have failed: each waits twice as long as the last before trying again. */
+  failures: number;
   /** When the agent may decide next (ms since epoch): after `interval`, and after the actor has settled. */
   nextAt: number;
   /** How long the actor must stay unchanged before a decision, in ms. */
@@ -119,8 +121,9 @@ export interface JevAgentContext<TEvent extends EventObject = EventObject> {
   changedAt: number;
 }
 
-/** How long the agent waits after a failed request before trying again, in ms. */
+/** How long the agent waits after a failed request before trying again, in ms: doubled for each failure in a row, up to `MAX_RETRY_MS`. */
 const RETRY_MS = 1000;
+const MAX_RETRY_MS = 30_000;
 
 const warnLoop = (loop: JevLoop) => console.warn(`[@xstate/jev] possible loop: ${loop.message}`, loop.chosen);
 
@@ -246,6 +249,7 @@ export function createJevLogic<TEvent extends EventObject, TContext extends Mach
       decisions: [],
       loop: null,
       error: null,
+      failures: 0,
       nextAt: 0,
       settle: opts.settle ?? 0,
       actor: input?.actor ?? null,
@@ -276,7 +280,7 @@ export function createJevLogic<TEvent extends EventObject, TContext extends Mach
       'jev.reset': () => ({
         target: '.watching',
         reenter: true,
-        context: { decisions: [], loop: null, error: null, asked: null, replying: false, waitingOn: null, until: 0, nextAt: 0 },
+        context: { decisions: [], loop: null, error: null, failures: 0, asked: null, replying: false, waitingOn: null, until: 0, nextAt: 0 },
       }),
       'jev.settle': ({ context, event }) => ({ context: { settle: event.ms, nextAt: nextAt({ ...context, settle: event.ms }) } }),
     },
@@ -331,6 +335,7 @@ export function createJevLogic<TEvent extends EventObject, TContext extends Mach
                 decisions,
                 loop,
                 error: null,
+                failures: 0,
                 asked: null,
                 replying: false,
                 pending: null,
@@ -343,9 +348,13 @@ export function createJevLogic<TEvent extends EventObject, TContext extends Mach
           onError: ({ context, event, parent }, enq) => {
             const error = String(event.error);
             if (context.replying && parent) enq.sendTo(parent, { type: 'jev.failed', error });
-            // Not straight back: a failing request would otherwise be retried at once, again and again.
-            const until = Date.now() + RETRY_MS;
-            return { target: 'watching', context: { error, asked: null, replying: false, pending: null, until, nextAt: nextAt({ ...context, until }) } };
+            // Not straight back, and longer each time: a request that keeps failing (no server, a refused key) would otherwise be retried every second, for good.
+            const failures = context.failures + 1;
+            const until = Date.now() + Math.min(RETRY_MS * 2 ** (failures - 1), MAX_RETRY_MS);
+            return {
+              target: 'watching',
+              context: { error, failures, asked: null, replying: false, pending: null, until, nextAt: nextAt({ ...context, until }) },
+            };
           },
         },
       },
