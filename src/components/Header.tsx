@@ -4,8 +4,8 @@ import { useSlidingPill } from './motion';
 /** Which model runs the bar, from those this page can reach. */
 export interface ModelPick {
   value: ModelId;
-  /** Can the model run here: the server has its keys, or you can give yours. */
-  usable: (model: ModelId) => boolean;
+  /** Can the model run now: the server has a key for it, or one of yours reaches it. */
+  ready: (model: ModelId) => boolean;
   onChange: (model: ModelId) => void;
 }
 
@@ -79,12 +79,12 @@ export function Header(props: HeaderProps) {
             value={model.value}
             onChange={(e) => model.onChange(e.target.value as ModelId)}
             title={`${modelInfo(model.value).label}, by ${modelInfo(model.value).by}, makes every decision at this bar`}
-            className="h-9 w-[8.5rem] rounded-lg border border-[#3a3936] bg-[#1d1d1b] px-2.5 text-[13px] text-[#faf9f5]"
+            className="h-9 w-[11rem] rounded-lg border border-[#3a3936] bg-[#1d1d1b] px-2.5 text-[13px] text-[#faf9f5]"
           >
             {MODELS.map((m) => (
-              <option key={m.id} value={m.id} disabled={!model.usable(m.id)}>
-                {m.label}
-                {model.usable(m.id) ? '' : ' (not set up)'}
+              <option key={m.id} value={m.id}>
+                {m.label} ({m.by})
+                {model.ready(m.id) ? '' : ' · needs a key'}
               </option>
             ))}
           </select>
@@ -169,7 +169,7 @@ export function Header(props: HeaderProps) {
           </button>
         ) : null}
         {onForgetKey ? (
-          <button type="button" onClick={onForgetKey} className={ICON} aria-label="Forget key" title="Remove your Jev key from this browser">
+          <button type="button" onClick={onForgetKey} className={ICON} aria-label="Forget your keys" title="Remove the keys you gave from this browser">
             <ForgetKeyIcon />
           </button>
         ) : null}

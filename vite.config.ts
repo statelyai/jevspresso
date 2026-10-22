@@ -5,9 +5,10 @@ import viteReact from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 // Dev runs in the Workers runtime too (workerd), as the deployed app does.
+// Tests run on Node: the plugin would put Vitest in workerd as well.
 export default defineConfig({
   plugins: [
-    cloudflare({ viteEnvironment: { name: 'ssr' } }),
+    ...(process.env.VITEST ? [] : [cloudflare({ viteEnvironment: { name: 'ssr' } })]),
     tailwindcss(),
     tanstackStart(),
     viteReact(),

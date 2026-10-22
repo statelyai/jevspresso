@@ -1,57 +1,72 @@
 /**
- * Keys you paste in, for a model the server has none for: a TypeSafe key for
- * Jev, a Cloudflare account and token for Clef. Each is kept in this browser
- * only (localStorage), and sent along with that model's requests, which use
- * it for that one call and keep nothing (see `lib/jev.ts`).
+ * Keys you paste in, for models the server has none for: a gateway's (one
+ * key, every model it carries), or a maker's own (TypeSafe's for Jev, a
+ * Cloudflare account and token for Clef). Each is kept in this browser only
+ * (localStorage), and sent along with the requests it can serve, which use it
+ * for that one call and keep nothing (see `lib/jev.ts`).
  */
-import type { Provider } from './models';
+import { modelInfo, type KeyHolder, type ModelId } from './models';
 
 export interface Credentials {
-  /** TypeSafe's key. */
+  /** A TypeSafe or gateway API key. */
   key?: string;
   /** Cloudflare's account ID and API token. */
   account?: string;
   token?: string;
 }
 
-const STORAGE: Record<Provider, string> = {
+export type PageKeys = Partial<Record<KeyHolder, Credentials>>;
+
+const STORAGE: Record<KeyHolder, string> = {
   typesafe: 'jevspresso:typesafe-key',
   cloudflare: 'jevspresso:cloudflare',
+  openrouter: 'jevspresso:openrouter-key',
+  vercel: 'jevspresso:vercel-key',
 };
+/** Kept as the key itself; the rest as JSON. */
+const PLAIN: readonly KeyHolder[] = ['typesafe', 'openrouter', 'vercel'];
+const HOLDERS = Object.keys(STORAGE) as KeyHolder[];
 
-const current: Partial<Record<Provider, Credentials>> = {};
+let current: PageKeys = {};
 
-/** The keys in use for a provider, if you gave them. */
-export function userCredentials(provider: Provider | undefined): Credentials | null {
-  return (provider && current[provider]) || null;
+/** Your keys that can reach this model, to send with its requests. */
+export function keysFor(model: ModelId): PageKeys {
+  const info = modelInfo(model);
+  return Object.fromEntries(Object.entries(current).filter(([h]) => h === info.provider || h in info.gateways));
 }
 
-/** Read them back from this browser, if they were saved here. */
-export function loadCredentials(provider: Provider): Credentials | null {
-  try {
-    const saved = localStorage.getItem(STORAGE[provider]);
-    // TypeSafe's key has always been kept as it is; the rest as JSON.
-    current[provider] = saved ? (provider === 'typesafe' ? { key: saved } : (JSON.parse(saved) as Credentials)) : undefined;
-  } catch {
-    current[provider] = undefined;
+/** Read every key back from this browser, if any were saved here. */
+export function loadKeys(): PageKeys {
+  const keys: PageKeys = {};
+  for (const holder of HOLDERS) {
+    try {
+      const saved = localStorage.getItem(STORAGE[holder]);
+      if (saved) keys[holder] = PLAIN.includes(holder) ? { key: saved } : (JSON.parse(saved) as Credentials);
+    } catch {
+      // Storage blocked, or a value from elsewhere: as if none.
+    }
   }
-  return current[provider] ?? null;
+  return (current = keys);
 }
 
-export function saveCredentials(provider: Provider, credentials: Credentials): void {
-  current[provider] = credentials;
+export function saveKey(holder: KeyHolder, credentials: Credentials): PageKeys {
+  current = { ...current, [holder]: credentials };
   try {
-    localStorage.setItem(STORAGE[provider], provider === 'typesafe' ? (credentials.key ?? '') : JSON.stringify(credentials));
+    localStorage.setItem(STORAGE[holder], PLAIN.includes(holder) ? (credentials.key ?? '') : JSON.stringify(credentials));
   } catch {
-    // Storage blocked: the keys still work until the page closes.
+    // Storage blocked: the key still works until the page closes.
   }
+  return current;
 }
 
-export function forgetCredentials(provider: Provider): void {
-  current[provider] = undefined;
-  try {
-    localStorage.removeItem(STORAGE[provider]);
-  } catch {
-    // Nothing saved to forget.
+/** Take every key you gave out of this browser. */
+export function forgetKeys(): PageKeys {
+  for (const holder of HOLDERS) {
+    try {
+      localStorage.removeItem(STORAGE[holder]);
+    } catch {
+      // Nothing saved to forget.
+    }
   }
+  return (current = {});
 }

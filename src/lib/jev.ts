@@ -1,46 +1,71 @@
 /**
  * Server-side decision models: TanStack Start server functions, and every
- * provider is only called inside them. Keys come from the environment
- * (`TYPESAFE_API_KEY` for Jev, and see `PROVIDERS` for the rest), in
- * development too, and then never reach the browser. Without them, the bar
- * is closed, unless you give keys of your own (Jev's, or Clef's): they stay
- * in your browser (`lib/key.ts`) and come along with that model's requests,
- * used for that one call and never kept here.
+ * model is only called inside them. A model is reached directly, with its
+ * maker's key, or through a gateway (OpenRouter, Vercel AI Gateway), where one
+ * key reaches every model the gateway carries. Keys come from the environment
+ * (see `.env.template`), in development too, and then never reach the browser.
+ * Without them, you can give your own: they stay in your browser
+ * (`lib/key.ts`) and come along with the requests they can serve, used for
+ * that one call and never kept here.
  */
 import { createServerFn } from '@tanstack/react-start';
 import { TypeSafeClient } from '@typesafe-ai/sdk';
 import type { JevClient, JevRequest, JevResponse } from '@xstate/jev';
 import { baristaQuestions } from './barista';
 import { answersToParsedOrder, buildParseQuestions, type Answers } from './jev-core';
-import { userCredentials, type Credentials } from './key';
+import { keysFor, type PageKeys } from './key';
 import { logged } from './jevLog';
-import { modelInfo, type ModelId } from './models';
+import { GATEWAYS, isModelId, JEV_MODEL, MODELS, modelInfo, type ModelId, type ModelInfo } from './models';
 import type { BarSnapshot, ParsedOrder } from './types';
 
-/** Is Jev configured? The page checks before opening the bar. */
-export const jevAvailable = createServerFn({ method: 'GET' }).handler(async () => Boolean(process.env.TYPESAFE_API_KEY));
+/** One way to a model: who answers it, with what key. */
+type Route =
+  | { via: 'typesafe'; key: string }
+  | { via: 'kev'; baseURL: string; key?: string }
+  | { via: 'cloudflare'; account: string; token: string }
+  | { via: 'openrouter'; key: string; model: string }
+  | { via: 'vercel'; key: string; model: string };
 
-let envClient: TypeSafeClient | null = null;
-
-/** The server's own key if it has one; otherwise the key that came with the request, for this call only. */
-function clientFor(apiKey: string | undefined): TypeSafeClient {
-  if (process.env.TYPESAFE_API_KEY) return (envClient ??= new TypeSafeClient({ timeout: 30_000 }));
-  if (!apiKey) throw new Error('No Jev key: set TYPESAFE_API_KEY, or give one on the page.');
-  return new TypeSafeClient({ apiKey, timeout: 30_000 });
+/**
+ * How a request reaches a model: the server's keys before yours, and of each,
+ * the maker's own before a gateway's.
+ */
+export function routeFor(info: ModelInfo, keys: PageKeys = {}): Route | null {
+  const env = process.env;
+  const routes = (k: {
+    typesafe?: string;
+    kev?: string;
+    account?: string;
+    token?: string;
+    openrouter?: string;
+    vercel?: string;
+  }): (Route | null)[] => [
+    info.id === 'jev' && k.typesafe ? { via: 'typesafe', key: k.typesafe } : null,
+    info.id === 'kev' && k.kev ? { via: 'kev', baseURL: k.kev, key: env.KEV_API_KEY } : null,
+    info.provider === 'cloudflare' && k.account && k.token ? { via: 'cloudflare', account: k.account, token: k.token } : null,
+    info.gateways.openrouter && k.openrouter ? { via: 'openrouter', key: k.openrouter, model: info.gateways.openrouter } : null,
+    info.gateways.vercel && k.vercel ? { via: 'vercel', key: k.vercel, model: info.gateways.vercel } : null,
+  ];
+  return (
+    [
+      ...routes({
+        typesafe: env.TYPESAFE_API_KEY,
+        kev: env.KEV_BASE_URL,
+        account: env.CLOUDFLARE_ACCOUNT_ID,
+        token: env.CLOUDFLARE_API_TOKEN,
+        openrouter: env.OPENROUTER_API_KEY,
+        vercel: env.AI_GATEWAY_API_KEY,
+      }),
+      ...routes({
+        typesafe: keys.typesafe?.key,
+        account: keys.cloudflare?.account,
+        token: keys.cloudflare?.token,
+        openrouter: keys.openrouter?.key,
+        vercel: keys.vercel?.key,
+      }),
+    ].find((r) => r !== null) ?? null
+  );
 }
-
-type Ask = (state: unknown, questions: Record<string, unknown>, credentials?: Credentials) => Promise<Answers>;
-
-// The SDK's question types are structurally identical to what we build here;
-// the casts keep the dynamic (per-request) criteria maps out of the generics.
-async function systemOne(client: TypeSafeClient, state: unknown, questions: Record<string, unknown>): Promise<Answers> {
-  const result = await client.systemOne({ state: state as never, questions: questions as never });
-  return result.answers as unknown as Answers;
-}
-
-let kevClient: TypeSafeClient | null = null;
-
-type ClefModel = 'clef' | 'clef-flash' | 'clef-omni';
 
 interface ClefPayload {
   result?: { response?: { answers?: Answers }; answers?: Answers };
@@ -52,31 +77,48 @@ export function clefAnswers(payload: ClefPayload): Answers | undefined {
   return payload.result?.response?.answers ?? payload.result?.answers ?? payload.answers;
 }
 
-/** Clef takes at most this many questions in one request. */
-const CLEF_MAX_QUESTIONS = 64;
+// The SDK's question types are structurally identical to what we build here;
+// the casts keep the dynamic (per-request) criteria maps out of the generics.
+async function systemOne(client: TypeSafeClient, model: string, state: unknown, questions: Record<string, unknown>): Promise<Answers> {
+  const result = await client.systemOne({ model, state: state as never, questions: questions as never });
+  return result.answers as unknown as Answers;
+}
 
-/**
- * Clef on Workers AI: Jev's request and answers. A request with more questions
- * than Clef takes (an order's parse has 81) goes as several at once, over the
- * same state, and their answers are put back together.
- */
-async function askClef(model: ClefModel, state: unknown, questions: Record<string, unknown>, credentials?: Credentials): Promise<Answers> {
-  const fromEnv = process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN;
-  const account = fromEnv ? process.env.CLOUDFLARE_ACCOUNT_ID : credentials?.account;
-  const token = fromEnv ? process.env.CLOUDFLARE_API_TOKEN : credentials?.token;
-  if (!account || !token) throw new Error('No Clef key: set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN, or give them on the page.');
-  // It goes into the URL: an account ID, and nothing else.
-  if (!/^[0-9a-f]{32}$/i.test(account)) throw new Error('That is not a Cloudflare account ID (32 hex characters).');
-  const entries = Object.entries(questions);
-  const chunks = Array.from({ length: Math.ceil(entries.length / CLEF_MAX_QUESTIONS) }, (_, i) =>
-    Object.fromEntries(entries.slice(i * CLEF_MAX_QUESTIONS, (i + 1) * CLEF_MAX_QUESTIONS)),
-  );
-  const answers = await Promise.all(
-    chunks.map(async (chunk) => {
-      const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/@cf/cloudflare/${model}`, {
+/** One request, one way. Everyone takes Jev's request shape; only the envelopes differ. */
+async function askVia(route: Route, info: ModelInfo, state: unknown, questions: Record<string, unknown>): Promise<Answers> {
+  switch (route.via) {
+    case 'typesafe':
+      return systemOne(new TypeSafeClient({ apiKey: route.key, timeout: 30_000 }), JEV_MODEL, state, questions);
+    // Kev serves TypeSafe's API (`POST /v1/systemone`), and Vercel's gateway a TypeSafe-compatible one: the SDK talks to both as is.
+    case 'kev':
+      return systemOne(new TypeSafeClient({ baseURL: route.baseURL, apiKey: route.key || 'kev', timeout: 30_000, compression: false }), 'kev', state, questions);
+    case 'vercel':
+      return systemOne(
+        new TypeSafeClient({ baseURL: 'https://ai-gateway.vercel.sh/typesafe', apiKey: route.key, timeout: 30_000, compression: false }),
+        route.model,
+        state,
+        questions,
+      );
+    case 'openrouter': {
+      // The Decisions API, which every decision model on OpenRouter answers.
+      const response = await fetch('https://openrouter.ai/api/alpha/decisions', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, state, questions: chunk }),
+        headers: { Authorization: `Bearer ${route.key}`, 'Content-Type': 'application/json', 'X-Title': 'Jevspresso' },
+        body: JSON.stringify({ model: route.model, state, questions }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      const payload = (await response.json()) as { answers?: Answers; error?: { message?: string } };
+      if (!response.ok) throw new Error(payload.error?.message || `OpenRouter returned ${response.status}`);
+      if (!payload.answers) throw new Error('OpenRouter returned no answers');
+      return payload.answers;
+    }
+    case 'cloudflare': {
+      // It goes into the URL: an account ID, and nothing else.
+      if (!/^[0-9a-f]{32}$/i.test(route.account)) throw new Error('That is not a Cloudflare account ID (32 hex characters).');
+      const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${route.account}/ai/run/@cf/cloudflare/${info.id}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${route.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: info.id, state, questions }),
         signal: AbortSignal.timeout(30_000),
       });
       // The REST API wraps what the model returns in `result`; taken either way.
@@ -85,58 +127,55 @@ async function askClef(model: ClefModel, state: unknown, questions: Record<strin
       const got = clefAnswers(payload);
       if (!got) throw new Error('Clef returned no answers');
       return got;
-    }),
-  );
-  return Object.assign({}, ...answers);
+    }
+  }
 }
 
-/** How each model is reached. All of them take Jev's request shape. */
-const PROVIDERS: Record<ModelId, Ask> = {
-  jev: (state, questions, credentials) => systemOne(clientFor(credentials?.key), state, questions),
-  // Kev serves TypeSafe's API (`POST /v1/systemone`), so the SDK talks to it as is.
-  kev: (state, questions) => {
-    if (!process.env.KEV_BASE_URL) throw new Error('No Kev server: set KEV_BASE_URL.');
-    kevClient ??= new TypeSafeClient({ baseURL: process.env.KEV_BASE_URL, apiKey: process.env.KEV_API_KEY || 'kev', timeout: 30_000 });
-    return systemOne(kevClient, state, questions);
-  },
-  clef: (state, questions, credentials) => askClef('clef', state, questions, credentials),
-  'clef-flash': (state, questions, credentials) => askClef('clef-flash', state, questions, credentials),
-  'clef-omni': (state, questions, credentials) => askClef('clef-omni', state, questions, credentials),
-  // In limited preview, and its request format is not published yet.
-  openai: async () => {
-    throw new Error('The OpenAI Decisions API is not available yet.');
-  },
-};
+/** What to set, or give, for a model nothing can reach yet. */
+function needs(info: ModelInfo): string {
+  const own =
+    info.id === 'jev' ? 'TYPESAFE_API_KEY' : info.id === 'kev' ? 'KEV_BASE_URL' : info.provider === 'cloudflare' ? 'CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN' : null;
+  const gateways = (Object.keys(info.gateways) as (keyof typeof GATEWAYS)[]).map((g) => (g === 'openrouter' ? 'OPENROUTER_API_KEY' : 'AI_GATEWAY_API_KEY'));
+  return `No key for ${info.label}: set ${[own, ...gateways].filter(Boolean).join(' or ')}, or give one on the page.`;
+}
+
+/**
+ * Ask a model, the way it can be reached. A request with more questions than
+ * the model takes (an order's parse has 81; Clef takes 64) goes as several at
+ * once, over the same state, and their answers are put back together.
+ */
+export async function ask(model: ModelId, state: unknown, questions: Record<string, unknown>, keys?: PageKeys): Promise<Answers> {
+  const info = modelInfo(model);
+  const route = routeFor(info, keys);
+  if (!route) throw new Error(needs(info));
+  const entries = Object.entries(questions);
+  const size = info.maxQuestions ?? entries.length;
+  const chunks = Array.from({ length: Math.ceil(entries.length / size) }, (_, i) => Object.fromEntries(entries.slice(i * size, (i + 1) * size)));
+  return Object.assign({}, ...(await Promise.all(chunks.map((chunk) => askVia(route, info, state, chunk)))));
+}
 
 interface AskModelInput {
   model: ModelId;
   request: JevRequest;
-  credentials?: Credentials;
+  keys?: PageKeys;
 }
 
 export function validateAskModelInput(input: AskModelInput): AskModelInput {
-  if (!Object.hasOwn(PROVIDERS, input.model)) {
+  if (!isModelId(input.model)) {
     throw new Error(`Unknown model: ${String(input.model)}`);
   }
   return input;
 }
 
-/** Which models this server can reach with its own keys. Jev and Clef can also take yours, from the page. */
+/** Which models this server can reach with its own keys. Any of them can also take yours, from the page. */
 export const modelsAvailable = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<Record<ModelId, boolean>> => ({
-    jev: Boolean(process.env.TYPESAFE_API_KEY),
-    kev: Boolean(process.env.KEV_BASE_URL),
-    clef: Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN),
-    'clef-flash': Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN),
-    'clef-omni': Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN),
-    openai: false,
-  }),
+  async (): Promise<Record<ModelId, boolean>> => Object.fromEntries(MODELS.map((m) => [m.id, routeFor(m) !== null])) as Record<ModelId, boolean>,
 );
 
 const askModel = createServerFn({ method: 'POST' })
   .validator(validateAskModelInput)
-  .handler(async ({ data: { model, request, credentials } }): Promise<JevResponse> => {
-    return { answers: (await PROVIDERS[model](request.state, request.questions, credentials)) as JevResponse['answers'] };
+  .handler(async ({ data: { model, request, keys } }): Promise<JevResponse> => {
+    return { answers: (await ask(model, request.state, request.questions, keys)) as JevResponse['answers'] };
   });
 
 /** Which agent is asking: the barista's requests carry extra questions. */
@@ -150,8 +189,7 @@ type AgentKind = 'barista' | 'router' | 'light' | 'parse';
  */
 export function decisionClient(kind: AgentKind, model: ModelId = 'jev'): JevClient {
   // Logged as sent, extra questions included (see `jevLog`); keys travel beside the request, never in it.
-  const provider = modelInfo(model).provider;
-  const send = logged(kind, (request) => askModel({ data: { model, request, credentials: userCredentials(provider) ?? undefined } }), model);
+  const send = logged(kind, (request) => askModel({ data: { model, request, keys: keysFor(model) } }), model);
   return (request) =>
     send(
       kind === 'barista'

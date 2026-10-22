@@ -686,7 +686,8 @@ describe('createJevLogic', () => {
     const loops: JevLoop[] = [];
     const uncached = owner(start(), pingPong(), { cache: false, loops: { onLoop: (l) => loops.push(l) } }, true);
     uncached.actor.send({ type: 'ask' });
-    await vi.waitFor(() => expect(loops).toHaveLength(1));
+    // It keeps going round until stopped, so a slow check can find it reported more than once.
+    await vi.waitFor(() => expect(loops.length).toBeGreaterThanOrEqual(1));
     expect(loops[0]).toMatchObject({ kind: 'cycle' });
     uncached.actor.stop();
 

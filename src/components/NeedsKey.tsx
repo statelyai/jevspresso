@@ -1,27 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
-import { forgetCredentials, loadCredentials, saveCredentials, type Credentials } from '../lib/key';
-import { modelInfo, type ModelId } from '../lib/models';
+import { forgetKeys, loadKeys, saveKey, type Credentials, type PageKeys } from '../lib/key';
+import { GATEWAYS, gatewaysFor, modelInfo, reaches, type Gateway, type KeyHolder, type ModelId } from '../lib/models';
 
 const REPO = 'https://github.com/statelyai/jevspresso';
 
-/**
- * The keys a model runs on: the server's, or your own from this browser.
- * Yours are `undefined` until the page is in the browser, `null` when there
- * are none.
- */
-export function useModelKey(model: ModelId, serverHasKey: boolean) {
-  const provider = modelInfo(model).provider;
-  const [credentials, setCredentials] = useState<Credentials | null | undefined>(undefined);
-  useEffect(() => setCredentials(provider ? loadCredentials(provider) : null), [provider]);
+/** The keys you gave in this browser: `undefined` until the page is in the browser. */
+export function usePageKeys() {
+  const [keys, setKeys] = useState<PageKeys | undefined>(undefined);
+  useEffect(() => setKeys(loadKeys()), []);
   return {
+    keys,
+    /** Whose keys you gave. */
+    holders: Object.keys(keys ?? {}) as KeyHolder[],
+    save: (holder: KeyHolder, credentials: Credentials) => setKeys(saveKey(holder, credentials)),
+    forget: () => setKeys(forgetKeys()),
+  };
+}
+
+/** A model's keys: the server's, or yours from this browser (a gateway's, or its maker's). */
+export function useModelKey(model: ModelId, serverHasKey: boolean) {
+  const page = usePageKeys();
+  return {
+    ...page,
     /** Show the "needs a key" note over the page. */
-    missing: !serverHasKey && credentials === null,
-    /** Take your own keys out of this browser, when they are yours in use. */
-    forget: !serverHasKey && provider && credentials ? () => (forgetCredentials(provider), setCredentials(null)) : undefined,
-    save: (c: Credentials) => {
-      if (provider) saveCredentials(provider, c);
-      setCredentials(c);
-    },
+    missing: !serverHasKey && page.keys !== undefined && !reaches(model, page.holders),
+    /** Take your keys out of this browser, when you gave any. */
+    forget: page.holders.length ? page.forget : undefined,
   };
 }
 
@@ -31,20 +35,34 @@ export function useJevKey(serverHasKey: boolean) {
 }
 
 const FIELD = 'h-11 min-w-0 grow rounded-lg border border-[#3a3936] bg-[#141413] px-3.5 text-[15px] text-[#faf9f5]';
+const SUBMIT = 'h-11 shrink-0 rounded-lg bg-[#d97757] px-5 text-sm font-semibold text-[#141413] disabled:opacity-50';
+const NOTE = 'text-[12px] text-[#6b6862]';
 
 /**
  * No key for the model on the server or in this browser: run it yourself, or
- * bring your own. `onCancel` offers a way back to a model that has one.
+ * bring your own key: a gateway's, which reaches every model it carries, or
+ * the model's maker's. `onCancel` offers a way back to Jev.
  */
-export function NeedsKey({ model = 'jev', onKey, onCancel }: { model?: ModelId; onKey: (credentials: Credentials) => void; onCancel?: () => void }) {
+export function NeedsKey({
+  model = 'jev',
+  onKey,
+  onCancel,
+}: {
+  model?: ModelId;
+  onKey: (holder: KeyHolder, credentials: Credentials) => void;
+  onCancel?: () => void;
+}) {
   const info = modelInfo(model);
+  const gateways = gatewaysFor(model);
+  const [gateway, setGateway] = useState<Gateway | undefined>(gateways[0]);
+  const [gatewayKey, setGatewayKey] = useState('');
   const [key, setKey] = useState('');
   const [account, setAccount] = useState('');
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (ref.current && !ref.current.open) ref.current.showModal();
   }, []);
-  const credentials: Credentials | null =
+  const own: Credentials | null =
     info.provider === 'typesafe' ? (key.trim() ? { key: key.trim() } : null)
     : info.provider === 'cloudflare' ? (key.trim() && account.trim() ? { account: account.trim(), token: key.trim() } : null)
     : null;
@@ -63,12 +81,8 @@ export function NeedsKey({ model = 'jev', onKey, onCancel }: { model?: ModelId; 
             {info.label} needs a key
           </h2>
           <p className="text-[14px] text-[#a8a49c]">
-            {info.label} makes every move behind this bar, and asks a model each time. Run Jevspresso yourself with your own key
-            {info.provider === 'typesafe'
-              ? ', or use your TypeSafe key here.'
-              : info.provider === 'cloudflare'
-                ? ', or use your Cloudflare account ID and a Workers AI token here.'
-                : `: ${info.label} is only reachable from the server.`}
+            {info.label} makes every move behind this bar, and asks a model each time. Run Jevspresso yourself with your own keys, or
+            give one here{gateways.length ? ': a gateway key reaches every model the gateway carries, so you can switch between them' : ''}.
           </p>
         </div>
         <a
@@ -80,16 +94,63 @@ export function NeedsKey({ model = 'jev', onKey, onCancel }: { model?: ModelId; 
           Run it locally
           <span className="text-[#a8a49c]">github.com/statelyai/jevspresso</span>
         </a>
+        {gateway ? (
+          <form
+            className="flex flex-col gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (gatewayKey.trim()) onKey(gateway, { key: gatewayKey.trim() });
+            }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <label htmlFor="gateway-key" className="text-[13px] text-[#a8a49c]">
+                One key for every model
+              </label>
+              {gateways.length > 1 ? (
+                <select
+                  aria-label="Gateway"
+                  value={gateway}
+                  onChange={(e) => setGateway(e.target.value as Gateway)}
+                  className="h-8 rounded-lg border border-[#3a3936] bg-[#141413] px-2 text-[13px] text-[#faf9f5]"
+                >
+                  {gateways.map((g) => (
+                    <option key={g} value={g}>
+                      {GATEWAYS[g].label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-[13px] text-[#a8a49c]">{GATEWAYS[gateway].label}</span>
+              )}
+            </div>
+            <div className="flex min-w-0 gap-2">
+              <input
+                id="gateway-key"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                value={gatewayKey}
+                onChange={(e) => setGatewayKey(e.target.value)}
+                placeholder={`Your ${GATEWAYS[gateway].keyName}`}
+                className={FIELD}
+              />
+              <button type="submit" disabled={!gatewayKey.trim()} className={SUBMIT}>
+                Open the bar
+              </button>
+            </div>
+          </form>
+        ) : null}
         {info.provider ? (
           <form
             className="flex flex-col gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              if (credentials) onKey(credentials);
+              if (own && info.provider) onKey(info.provider, own);
             }}
           >
             <label htmlFor="model-key" className="text-[13px] text-[#a8a49c]">
-              Or use your own {info.provider === 'cloudflare' ? 'account' : 'key'}
+              {gateway ? 'Or ' : ''}
+              {info.provider === 'cloudflare' ? 'your Cloudflare account' : 'your TypeSafe key'}, for {info.label} only
             </label>
             {info.provider === 'cloudflare' ? (
               <input
@@ -113,20 +174,16 @@ export function NeedsKey({ model = 'jev', onKey, onCancel }: { model?: ModelId; 
                 placeholder={info.provider === 'cloudflare' ? 'A Workers AI API token' : 'Your TypeSafe key'}
                 className={FIELD}
               />
-              <button
-                type="submit"
-                disabled={!credentials}
-                className="h-11 shrink-0 rounded-lg bg-[#d97757] px-5 text-sm font-semibold text-[#141413] disabled:opacity-50"
-              >
+              <button type="submit" disabled={!own} className={SUBMIT}>
                 Open the bar
               </button>
             </div>
-            <p className="text-[12px] text-[#6b6862]">
-              Saved in this browser only. It goes along with each {info.label} request through this app&apos;s server, which uses it
-              for that call and keeps nothing. Forget it any time from the header.
-            </p>
           </form>
         ) : null}
+        <p className={NOTE}>
+          Saved in this browser only. A key goes along with the requests it can serve, through this app&apos;s server, which uses it
+          for that call and keeps nothing. Forget your keys any time from the header.
+        </p>
         {onCancel ? (
           <button type="button" onClick={onCancel} className="self-start text-[13px] text-[#a8a49c] underline-offset-2 hover:underline">
             Use Jev instead

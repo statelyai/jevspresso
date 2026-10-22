@@ -6,8 +6,8 @@ export interface ScorecardProps {
   model: ModelId;
   seed: number;
   score: DayScore;
-  /** Can a model run here (to offer the same day with it). */
-  usable: (model: ModelId) => boolean;
+  /** Can a model run now (to offer the same day with it). */
+  ready: (model: ModelId) => boolean;
   /** The same day, with this model. */
   onDay: (model: ModelId) => void;
   onNewDay: () => void;
@@ -28,9 +28,9 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /** The day is over: how the model did, and the same day with another. */
-export function Scorecard({ model, seed, score: s, usable, onDay, onNewDay, onLeave }: ScorecardProps) {
+export function Scorecard({ model, seed, score: s, ready, onDay, onNewDay, onLeave }: ScorecardProps) {
   const ref = useRef<HTMLDialogElement>(null);
-  const others = MODELS.filter((m) => m.id !== model && usable(m.id));
+  const others = MODELS.filter((m) => m.id !== model && ready(m.id));
   const [other, setOther] = useState<ModelId | undefined>(others[0]?.id);
   useEffect(() => {
     if (ref.current && !ref.current.open) ref.current.showModal();

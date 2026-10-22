@@ -22,7 +22,7 @@ import { downloadLog, jevLog } from '../lib/jevLog';
 import { NeedsKey, useModelKey } from '../components/NeedsKey';
 import { Scorecard } from '../components/Scorecard';
 import { DAY } from '../lib/day';
-import { isModelId, modelInfo, type ModelId } from '../lib/models';
+import { isModelId, reaches, type ModelId } from '../lib/models';
 import { dayScore } from '../lib/score';
 import { WorldClock } from '../lib/worldClock';
 import type { barMachine, BaristaAgent } from '../machines';
@@ -57,7 +57,7 @@ function Page() {
     navigate({ search: { ...(search.model === 'jev' ? {} : { model: search.model }), ...(search.day === undefined ? {} : { day: search.day }) } });
   const pick: ModelPick = {
     value: model,
-    usable: (m) => available[m] || Boolean(modelInfo(m).provider),
+    ready: (m) => available[m] || reaches(m, key.holders),
     onChange: (m) => go({ model: m, day }),
   };
   return (
@@ -276,7 +276,7 @@ function DayBar({
           model={model}
           seed={seed}
           score={score()}
-          usable={pick.usable}
+          ready={pick.ready}
           onDay={(m) => onDay(m, seed)}
           onNewDay={() => onDay(model, newDay())}
           onLeave={onLeave}

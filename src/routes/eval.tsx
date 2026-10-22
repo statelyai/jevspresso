@@ -5,7 +5,7 @@ import { runScenario, SCENARIOS, type RunResult } from '../eval/scenarios';
 import { logClient, type JevClient, type JevLogEntry } from '@xstate/jev';
 import { decisionClient } from '../lib/jev';
 import { downloadLog } from '../lib/jevLog';
-import { loadCredentials } from '../lib/key';
+import { loadKeys } from '../lib/key';
 
 /**
  * The scenarios (`src/eval/scenarios.ts`), run with real Jev, with your key if
@@ -31,7 +31,7 @@ function Eval() {
   const [open, setOpen] = useState<{ ablation: string; scenario: string } | null>(null);
   // Every request of the last run, with what came back, for a download.
   const log = useRef<Array<JevLogEntry & { ablation: string; scenario: string; run: number }>>([]);
-  useEffect(() => void loadCredentials('typesafe'), []);
+  useEffect(() => void loadKeys(), []);
 
   const run = async () => {
     setRunning(true);

@@ -6,7 +6,7 @@ import type { AnyActorRef } from 'xstate';
 import { JevMark } from '../components/JevMark';
 import { ForgetKeyIcon } from '../components/Header';
 import { NeedsKey, useJevKey } from '../components/NeedsKey';
-import { decisionClient, jevAvailable } from '../lib/jev';
+import { decisionClient, modelsAvailable } from '../lib/jev';
 import { createLightMachine, isLit, type LampValue, type LightEvent } from '../machines/light';
 
 /**
@@ -14,7 +14,7 @@ import { createLightMachine, isLit, type LampValue, type LightEvent } from '../m
  * The machine is in `src/machines/light.ts`; Jev is invoked at its top.
  */
 export const Route = createFileRoute('/light')({
-  loader: () => jevAvailable(),
+  loader: async () => (await modelsAvailable()).jev,
   component: LightPage,
 });
 
