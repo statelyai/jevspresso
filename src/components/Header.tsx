@@ -64,6 +64,15 @@ export function ForgetKeyIcon() {
   );
 }
 
+function ModelOption({ id }: { id: ModelId }) {
+  const { label, by } = modelInfo(id);
+  return (
+    <option value={id}>
+      {label} ({by})
+    </option>
+  );
+}
+
 export function Header(props: HeaderProps) {
   const { text, onText, onSubmit, onRush, replying, speed, onSpeed, onReset, inspectorOpen, onInspector, onForgetKey, onDownloadLog, model, onPlayDay, day } = props;
   const { barRef, pillRef } = useSlidingPill(Math.max(0, SPEEDS.indexOf(speed)));
@@ -79,14 +88,18 @@ export function Header(props: HeaderProps) {
             value={model.value}
             onChange={(e) => model.onChange(e.target.value as ModelId)}
             title={`${modelInfo(model.value).label}, by ${modelInfo(model.value).by}, makes every decision at this bar`}
-            className="h-9 w-[11rem] rounded-lg border border-[#3a3936] bg-[#1d1d1b] px-2.5 text-[13px] text-[#faf9f5]"
+            className="h-9 max-w-[15rem] rounded-lg border border-[#3a3936] bg-[#1d1d1b] px-2.5 text-[13px] text-[#faf9f5] field-sizing-content"
           >
-            {MODELS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label} ({m.by})
-                {model.ready(m.id) ? '' : ' · needs a key'}
-              </option>
-            ))}
+            {/* Grouped, not labelled: the closed picker shows the model's name and nothing cut short after it. */}
+            {MODELS.every((m) => model.ready(m.id))
+              ? MODELS.map((m) => <ModelOption key={m.id} id={m.id} />)
+              : (['Ready', 'Needs a key'] as const).map((group) => (
+                  <optgroup key={group} label={group}>
+                    {MODELS.filter((m) => model.ready(m.id) === (group === 'Ready')).map((m) => (
+                      <ModelOption key={m.id} id={m.id} />
+                    ))}
+                  </optgroup>
+                ))}
           </select>
         </label>
       ) : null}

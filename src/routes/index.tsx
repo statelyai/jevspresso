@@ -57,7 +57,8 @@ function Page() {
     navigate({ search: { ...(search.model === 'jev' ? {} : { model: search.model }), ...(search.day === undefined ? {} : { day: search.day }) } });
   const pick: ModelPick = {
     value: model,
-    ready: (m) => available[m] || reaches(m, key.holders),
+    // Until your keys are read (the server's render), nothing is said to need one.
+    ready: (m) => available[m] || key.keys === undefined || reaches(m, key.holders),
     onChange: (m) => go({ model: m, day }),
   };
   return (
@@ -110,7 +111,7 @@ function BaristaStatus({
 }) {
   if (hands) {
     return (
-      <div className="flex min-w-0 items-center gap-2 rounded-full bg-[#faf9f5] px-3.5 py-1.5 text-[13px] font-medium text-[#141413]">
+      <div className="flex items-center gap-2 rounded-full bg-[#faf9f5] px-3.5 py-1.5 text-[13px] font-medium text-[#141413]">
         <HandIcon size={15} />
         <span className="min-w-0 truncate">
           {hands.label}
@@ -121,16 +122,18 @@ function BaristaStatus({
     );
   }
   return (
-    <div className="flex min-w-0 items-center gap-2 rounded-full border border-[#3a3936] px-3.5 py-1.5 text-[13px] text-[#a8a49c]">
+    <div className="flex items-center gap-2 rounded-full border border-[#3a3936] px-3.5 py-1.5 text-[13px] text-[#a8a49c]">
       {state === 'thinking' ? (
-        <JevMark size={11} className="animate-pulse" />
+        <JevMark size={11} className="shrink-0 animate-pulse" />
       ) : (
         <span className="h-2 w-2 shrink-0 rounded-full bg-[#6b6862]" aria-hidden="true" />
       )}
-      {state === 'thinking' ? 'Thinking…' : state === 'paused' ? 'Your turn' : 'Watching'}
+      <span className="shrink-0">{state === 'thinking' ? 'Thinking…' : state === 'paused' ? 'Your turn' : 'Watching'}</span>
+      {/* The countdown is what gives way when there is no room; shorter where the stage is narrow. */}
       {state === 'watching' && nextMoveAt && nextMoveAt > ctx.now ? (
-        <span className="shrink-0 text-[#ffc48a]">
-          · next move in <span className="secs">{((nextMoveAt - ctx.now) / 1000).toFixed(1)}s</span>
+        <span className="min-w-0 truncate text-[#ffc48a]">
+          · <span className="hidden @2xl/stage:inline">next move in </span>
+          <span className="secs">{((nextMoveAt - ctx.now) / 1000).toFixed(1)}s</span>
         </span>
       ) : null}
     </div>
@@ -170,14 +173,16 @@ function PauseButton({ paused, onToggle }: { paused: boolean; onToggle: () => vo
       type="button"
       onClick={onToggle}
       aria-pressed={paused}
-      className={`flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] ${
+      aria-label={paused ? 'Resume Jev' : 'Pause Jev'}
+      title={paused ? 'Resume Jev' : 'Pause Jev'}
+      className={`flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-[13px] @md/stage:px-3.5 ${
         paused ? 'border-[#34d399] text-[#8ee6b4] hover:bg-[#0f2a1e]' : 'border-[#3a3936] text-[#cfcbc3] hover:border-[#6b6862]'
       }`}
     >
       <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
         {paused ? <path d="M3 1.5 L10.5 6 L3 10.5 Z" /> : <path d="M2.5 1.5 H5 V10.5 H2.5 Z M7 1.5 H9.5 V10.5 H7 Z" />}
       </svg>
-      {paused ? 'Resume Jev' : 'Pause Jev'}
+      <span className="hidden @md/stage:inline">{paused ? 'Resume Jev' : 'Pause Jev'}</span>
     </button>
   );
 }
@@ -489,15 +494,16 @@ export function BarView({ ctx: bar, intake, barista, send, inspect, timers, now,
               </div>}
             </div>
           ) : null}
-          <main className="grid min-h-[420px] min-w-0 grid-rows-[2.25rem_minmax(0,1fr)] gap-2 px-6 pt-4">
-            <div className="flex h-9 min-w-0 items-center justify-between gap-4">
+          <main className="@container/stage grid min-h-[420px] min-w-0 grid-rows-[auto_minmax(0,1fr)] gap-2 px-6 pt-4">
+            {/* By the stage's width, never by what is in it: the controls with the message under them, or, where all of it fits, one line with the message in what the controls leave. */}
+            <div className="flex h-[4.25rem] min-w-0 flex-wrap content-center items-center justify-between gap-x-4 gap-y-1.5 @4xl/stage:h-9 @4xl/stage:flex-nowrap">
               <div className="flex min-w-0 items-center gap-2">
                 <BaristaStatus state={state} hands={jevHands} ctx={ctx} nextMoveAt={barista.pace && barista.pace < 1 ? barista.nextDecisionAt : undefined} />
                 {onPause ? <PauseButton paused={state === 'paused'} onToggle={() => onPause(state !== 'paused')} /> : null}
                 {onPace ? <PaceControl pace={barista.pace ?? 1} onPace={onPace} /> : null}
-                {/* Your hands, apart from Jev's: the second barista. */}
+                {/* Your hands, apart from Jev's: the second barista. Where the stage is narrow, the hand on the machine says it. */}
                 {yourHands ? (
-                  <div className="flex min-w-0 items-center gap-2 rounded-full bg-[#e8845f] px-3.5 py-1.5 text-[13px] font-medium text-[#1f0f08]">
+                  <div className="hidden items-center gap-2 rounded-full bg-[#e8845f] px-3.5 py-1.5 text-[13px] font-medium text-[#1f0f08] @xl/stage:flex">
                     <HandIcon size={15} />
                     <span className="min-w-0 truncate">
                       You: {yourHands.label}
@@ -507,7 +513,7 @@ export function BarView({ ctx: bar, intake, barista, send, inspect, timers, now,
                   </div>
                 ) : null}
               </div>
-              <p className={`min-w-0 truncate text-[13px] ${error && !parsing && !routing ? 'text-[#ff9aa0]' : 'text-[#a8a49c]'}`}>
+              <p className={`min-w-0 basis-full truncate text-[13px] @4xl/stage:min-w-32 @4xl/stage:flex-1 @4xl/stage:basis-0 @4xl/stage:text-right ${error && !parsing && !routing ? 'text-[#ff9aa0]' : 'text-[#a8a49c]'}`}>
                 <TextSwap text={feedback} className="max-w-full truncate" />
               </p>
             </div>
