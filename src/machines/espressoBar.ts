@@ -2,7 +2,7 @@ import { createJevLogic, type JevDecision, type JevLoop } from '@xstate/jev';
 import { createAsyncLogic, createCallbackLogic, setup, types, type AnyActorLogic } from 'xstate';
 import { z } from 'zod';
 import { orderRouter } from '../lib/barista';
-import { jevClient, parseOrder } from '../lib/jev';
+import { decisionClient, parseOrder } from '../lib/jev';
 import {
   CHAOS_LEVELS,
   DEVICES,
@@ -64,7 +64,7 @@ const barista: AnyActorLogic = createCallbackLogic(() => {});
  * decides only when asked). It hands `order.confirm` / `order.cancel` straight
  * back to the bar.
  */
-const orderRouterAgent = createJevLogic<BarEvent, BarContext>({ ...orderRouter, client: jevClient('router'), auto: false });
+const orderRouterAgent = createJevLogic<BarEvent, BarContext>({ ...orderRouter, client: decisionClient('router'), auto: false });
 
 /**
  * Chaos does not know the current probabilities — it just rolls dice every
@@ -100,6 +100,7 @@ export function initialContext(): BarContext {
     speed: 1,
     breakProb: { grinder: CHAOS_LEVELS.low, groupHead: CHAOS_LEVELS.low, steamWand: CHAOS_LEVELS.low },
     pendingAt: 0,
+    orderQueue: [],
     nextDrinkNo: 1,
     error: null,
   };
@@ -120,6 +121,7 @@ function drinksFromOrder(order: ParsedOrder, startNo: number, now: number): Drin
         mods: { ...mods },
         status: 'queued',
         orderedAt: now,
+        orderText: order.text,
       });
       n++;
     }
@@ -155,6 +157,19 @@ function spend(inv: Inventory, cost: Spend): Inventory {
 
 /** Who is acting: every barista event says (`by`), Jev's own picks included (its agent's `fixed`). */
 type By = { by: Barista };
+
+/**
+ * A transition object as the runtime takes it: `matches` (a payload the
+ * event must carry), and either a `target` or `to` (a transition function),
+ * with a `description` Jev reads for the option. `setup()`'s transition
+ * typings in xstate 6.0.0-alpha.70 leave out `matches` and `to`, though the
+ * runtime runs both; typed here as the function it runs, or the plain target.
+ */
+function when<F extends (...args: never[]) => unknown>(config: { matches?: Record<string, unknown>; description?: string; to: F }): F;
+function when<const S extends { target: string; context?: Partial<BarContext> }>(config: S & { matches?: Record<string, unknown>; description?: string }): S;
+function when(config: object): unknown {
+  return config;
+}
 
 /** This barista's hands are on something already. */
 function handsBusy(ctx: BarContext, event: By): boolean {
@@ -600,8 +615,21 @@ export const espressoBarMachine = setup({
     /* ---------------------------------------------------------- intake --- */
     intake: {
       initial: 'idle',
+      // Not while idle (its own `order.submit` reads it at once): an order
+      // that comes in while another is being read or clarified waits its turn.
+      on: {
+        'order.submit': ({ context, event }) => ({
+          context: { orderQueue: [...context.orderQueue, { text: event.text, at: event.at }] },
+        }),
+        'bar.reset': { target: '.idle', reenter: true },
+      },
       states: {
         idle: {
+          always: ({ context }: { context: BarContext }) => {
+            const [next, ...rest] = context.orderQueue;
+            if (!next) return;
+            return { target: 'parsing', context: { pendingText: next.text, pendingAt: next.at, orderQueue: rest, error: null } };
+          },
           on: {
             'order.submit': ({ event }) => ({
               target: 'parsing',
@@ -648,7 +676,7 @@ export const espressoBarMachine = setup({
           initial: 'asking',
           // On the parent so they stay accepted while the router is deciding.
           on: {
-            'order.confirm': {
+            'order.confirm': when({
               description: 'the customer confirms the order as it was read back',
               to: ({ context }: { context: BarContext }) => ({
                 target: 'idle',
@@ -659,11 +687,11 @@ export const espressoBarMachine = setup({
                   nextDrinkNo: context.nextDrinkNo + drinkCount(context.pendingOrder),
                 },
               }),
-            },
-            'order.cancel': {
+            }),
+            'order.cancel': when({
               description: 'the customer says the order is wrong, or wants to start over',
               to: () => ({ target: 'idle', context: { pendingOrder: null, error: null } }),
-            },
+            }),
           },
           states: {
             asking: {
@@ -725,7 +753,7 @@ export const espressoBarMachine = setup({
           after: { grind: { target: 'grounds' } },
           on: {
             // Grounds half ground are lost with the grinder.
-            BREAK: { matches: { device: 'grinder' }, target: 'empty' },
+            BREAK: when({ matches: { device: 'grinder' }, target: 'empty' }),
           },
         },
         grounds: {
@@ -735,7 +763,7 @@ export const espressoBarMachine = setup({
               if (handsBusy(context, event)) return;
               return { target: 'tamping', context: { hands: handsOn(context, event, 'tamp') } };
             },
-            'barista.knockOut': { description: UNPULLED, to: knockOut },
+            'barista.knockOut': when({ description: UNPULLED, to: knockOut }),
           },
         },
         tamping: { after: { tamp: { target: 'tamped' } } },
@@ -746,12 +774,12 @@ export const espressoBarMachine = setup({
               if (handsBusy(context, event) || !deviceFree(barOf({ context, value }), 'groupHead')) return;
               return { target: 'lockingIn', context: { hands: handsOn(context, event, 'lock_in') } };
             },
-            'barista.knockOut': { description: UNPULLED, to: knockOut },
+            'barista.knockOut': when({ description: UNPULLED, to: knockOut }),
           },
         },
         lockingIn: {
           after: { lockIn: { target: 'locked' } },
-          on: { BREAK: { matches: { device: 'groupHead' }, target: 'tamped' } },
+          on: { BREAK: when({ matches: { device: 'groupHead' }, target: 'tamped' }) },
         },
         locked: {
           description: 'Locked into the group head, ready to pull a shot',
@@ -767,7 +795,7 @@ export const espressoBarMachine = setup({
                 },
               };
             },
-            'barista.knockOut': { description: UNPULLED, to: knockOut },
+            'barista.knockOut': when({ description: UNPULLED, to: knockOut }),
           },
         },
         pulling: {
@@ -780,16 +808,16 @@ export const espressoBarMachine = setup({
           },
           on: {
             // A shot cut short is lost; the grounds are still in there.
-            BREAK: { matches: { device: 'groupHead' }, target: 'locked', context: { shotCup: null } },
+            BREAK: when({ matches: { device: 'groupHead' }, target: 'locked', context: { shotCup: null } }),
           },
         },
         spent: {
           description: 'A spent puck, to knock out before the next grind',
           on: {
-            'barista.knockOut': {
+            'barista.knockOut': when({
               description: 'knock the spent puck out of the portafilter, emptying it for the next grind',
               to: knockOut,
-            },
+            }),
           },
         },
         knocking: { after: { knockOut: { target: 'empty' } } },
@@ -836,7 +864,7 @@ export const espressoBarMachine = setup({
           after: { steam: { target: 'steamed' } },
           on: {
             // Milk half steamed is poured away.
-            BREAK: { matches: { device: 'steamWand' }, target: 'empty', context: { pitcher: null } },
+            BREAK: when({ matches: { device: 'steamWand' }, target: 'empty', context: { pitcher: null } }),
           },
         },
         steamed: {
@@ -848,7 +876,7 @@ export const espressoBarMachine = setup({
           after: { foam: { target: 'foamed' } },
           on: {
             // Milk half foamed is poured away.
-            BREAK: { matches: { device: 'steamWand' }, target: 'empty', context: { pitcher: null } },
+            BREAK: when({ matches: { device: 'steamWand' }, target: 'empty', context: { pitcher: null } }),
           },
         },
         foamed: {
@@ -889,7 +917,7 @@ export const espressoBarMachine = setup({
           initial: 'free',
           on: { 'bar.reset': { target: '.free', reenter: true } },
           states: {
-            free: { always: { target: 'busy', guard: ({ context }: { context: BarContext }) => context.hands.jev !== null } },
+            free: { always: ({ context }: { context: BarContext }) => (context.hands.jev !== null ? { target: 'busy' } : undefined) },
             busy: { after: { jevHands: { target: 'free', context: ({ context }) => finishHands(context, 'jev') } } },
           },
         },
@@ -897,7 +925,7 @@ export const espressoBarMachine = setup({
           initial: 'free',
           on: { 'bar.reset': { target: '.free', reenter: true } },
           states: {
-            free: { always: { target: 'busy', guard: ({ context }: { context: BarContext }) => context.hands.you !== null } },
+            free: { always: ({ context }: { context: BarContext }) => (context.hands.you !== null ? { target: 'busy' } : undefined) },
             busy: { after: { yourHands: { target: 'free', context: ({ context }) => finishHands(context, 'you') } } },
           },
         },
@@ -915,17 +943,19 @@ export const espressoBarMachine = setup({
           initial: 'ok',
           on: { 'bar.reset': { target: '.ok', reenter: true } },
           states: {
-            ok: { on: { BREAK: { matches: { device: 'grinder' }, target: 'broken' } } },
+            ok: { on: { BREAK: when({ matches: { device: 'grinder' }, target: 'broken' }) } },
             broken: {
               on: {
-                'barista.repair': {
+                'barista.repair': when({
                   matches: { device: 'grinder' },
-                  guard: ({ context, event }: { context: BarContext; event: By }) => !handsBusy(context, event),
-                  target: 'repairing',
-                  context: ({ context, event }) => ({
-                    hands: hold(context, event, 'barista.repair', HANDS_ON_MS['barista.repair'], { device: event.device }),
-                  }),
-                },
+                  to: ({ context, event }: { context: BarContext; event: By & { device: Device } }) => {
+                    if (handsBusy(context, event)) return;
+                    return {
+                      target: 'repairing',
+                      context: { hands: hold(context, event, 'barista.repair', HANDS_ON_MS['barista.repair'], { device: event.device }) },
+                    };
+                  },
+                }),
               },
             },
             repairing: { after: { repair: { target: 'ok' } } },
@@ -935,17 +965,19 @@ export const espressoBarMachine = setup({
           initial: 'ok',
           on: { 'bar.reset': { target: '.ok', reenter: true } },
           states: {
-            ok: { on: { BREAK: { matches: { device: 'groupHead' }, target: 'broken' } } },
+            ok: { on: { BREAK: when({ matches: { device: 'groupHead' }, target: 'broken' }) } },
             broken: {
               on: {
-                'barista.repair': {
+                'barista.repair': when({
                   matches: { device: 'groupHead' },
-                  guard: ({ context, event }: { context: BarContext; event: By }) => !handsBusy(context, event),
-                  target: 'repairing',
-                  context: ({ context, event }) => ({
-                    hands: hold(context, event, 'barista.repair', HANDS_ON_MS['barista.repair'], { device: event.device }),
-                  }),
-                },
+                  to: ({ context, event }: { context: BarContext; event: By & { device: Device } }) => {
+                    if (handsBusy(context, event)) return;
+                    return {
+                      target: 'repairing',
+                      context: { hands: hold(context, event, 'barista.repair', HANDS_ON_MS['barista.repair'], { device: event.device }) },
+                    };
+                  },
+                }),
               },
             },
             repairing: { after: { repair: { target: 'ok' } } },
@@ -955,17 +987,19 @@ export const espressoBarMachine = setup({
           initial: 'ok',
           on: { 'bar.reset': { target: '.ok', reenter: true } },
           states: {
-            ok: { on: { BREAK: { matches: { device: 'steamWand' }, target: 'broken' } } },
+            ok: { on: { BREAK: when({ matches: { device: 'steamWand' }, target: 'broken' }) } },
             broken: {
               on: {
-                'barista.repair': {
+                'barista.repair': when({
                   matches: { device: 'steamWand' },
-                  guard: ({ context, event }: { context: BarContext; event: By }) => !handsBusy(context, event),
-                  target: 'repairing',
-                  context: ({ context, event }) => ({
-                    hands: hold(context, event, 'barista.repair', HANDS_ON_MS['barista.repair'], { device: event.device }),
-                  }),
-                },
+                  to: ({ context, event }: { context: BarContext; event: By & { device: Device } }) => {
+                    if (handsBusy(context, event)) return;
+                    return {
+                      target: 'repairing',
+                      context: { hands: hold(context, event, 'barista.repair', HANDS_ON_MS['barista.repair'], { device: event.device }) },
+                    };
+                  },
+                }),
               },
             },
             repairing: { after: { repair: { target: 'ok' } } },

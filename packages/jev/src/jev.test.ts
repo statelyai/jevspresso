@@ -686,7 +686,8 @@ describe('createJevLogic', () => {
     const loops: JevLoop[] = [];
     const uncached = owner(start(), pingPong(), { cache: false, loops: { onLoop: (l) => loops.push(l) } }, true);
     uncached.actor.send({ type: 'ask' });
-    await vi.waitFor(() => expect(loops).toHaveLength(1));
+    // It keeps going round until stopped, so a slow check can find it reported more than once.
+    await vi.waitFor(() => expect(loops.length).toBeGreaterThanOrEqual(1));
     expect(loops[0]).toMatchObject({ kind: 'cycle' });
     uncached.actor.stop();
 
@@ -748,6 +749,31 @@ describe('an agent invoked at the top of the machine it decides for', () => {
     jev.send({ type: 'jev.reset' });
     expect(agentOf(jev).context.decisions).toEqual([]);
     actor.stop();
+  });
+
+  it('waits longer after each failure in a row, and starts over once a request succeeds', async () => {
+    vi.useFakeTimers();
+    try {
+      let down = true;
+      const ok = scripted((_, keys) => keys.find((k) => k.endsWith('study')));
+      const client = vi.fn<JevClient>(async (request) => {
+        if (down) throw new Error('Failed to fetch');
+        return ok(request);
+      });
+      const actor = createActor(agentHouse(client)).start();
+      const jev = actor.getSnapshot().children.jev!;
+      // Tried at once, then after 1s, 2s, 4s and 8s: five times in 16s, not sixteen.
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(client).toHaveBeenCalledTimes(5);
+      expect(agentOf(jev).context).toMatchObject({ failures: 5, error: 'Error: Failed to fetch' });
+      down = false;
+      await vi.advanceTimersByTimeAsync(16_000);
+      expect(agentOf(jev).context).toMatchObject({ failures: 0, error: null });
+      expect(agentOf(jev).context.decisions).not.toHaveLength(0);
+      actor.stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

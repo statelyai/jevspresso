@@ -16,7 +16,7 @@ The repo is an example of using XState and Jev together, through [`@xstate/jev`]
 
 ```sh
 pnpm install
-cp .env.template .env   # set TYPESAFE_API_KEY
+cp .env.template .env   # set TYPESAFE_API_KEY, or a gateway key
 pnpm dev                # http://localhost:3000
 ```
 
@@ -85,6 +85,32 @@ Try it live at `/light` ([`src/machines/light.ts`](src/machines/light.ts)): the 
 - **Orders** are parsed by one Jev call that answers a set of closed questions about the text (which drinks, how many, which milk). Unclear orders go to a router agent that asks the customer to confirm.
 - **`/light`** is the smallest example: a lamp with your requests in its context, and Jev invoked at its top.
 - **`/eval`** runs scenarios (rushes, breakdowns, sabotage) against real Jev and reports how many orders were served correctly and what it cost.
+
+## Other decision models
+
+Jev (1.14) runs the bar by default. Pick another model in the header, or with `?model=`: every decision (reading orders, routing replies, the barista's moves) goes to it.
+
+One gateway key is enough to switch between models: [OpenRouter](https://openrouter.ai) carries all of them, and [Vercel AI Gateway](https://vercel.com/ai-gateway) all but Kev and Clef. A model's own key works too, and is tried first.
+
+<!-- decision-model providers and their environment requirements from src/lib/jev.ts and src/lib/models.ts -->
+
+| Model | `?model=` | Own key | OpenRouter | Vercel AI Gateway |
+| --- | --- | --- | --- | --- |
+| Jev 1.14 (TypeSafe) | `jev` | `TYPESAFE_API_KEY` | ✓ | ✓ |
+| Kev 4B (Jared Palmer) | `kev` | `KEV_BASE_URL` (self-hosted); optional `KEV_API_KEY` | ✓ | |
+| Clef, Clef Flash, Clef Omni (Cloudflare) | `clef`, `clef-flash`, `clef-omni` | `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` | ✓ | |
+| GPT-6 Luna Decisions (OpenAI) | `openai` | | ✓ | ✓ |
+| Decision-1 (Microsoft) | `microsoft` | | ✓ | ✓ |
+| Decider V1.2 (Perplexity) | `perplexity` | | ✓ | ✓ |
+| d1 (Liquid AI) | `liquid` | | ✓ | ✓ |
+
+Set them in `.env` (copy [`.env.template`](.env.template)): `OPENROUTER_API_KEY` or `AI_GATEWAY_API_KEY` for a gateway. Or give a key on the page (a gateway's, TypeSafe's, or a Cloudflare account and token): it stays in your browser and goes along with the requests it can serve.
+
+## Days
+
+**Play a day** (or open `?day=<seed>`) to give the bar twelve customers and a few mishaps (parts breaking, ingredients running out), each at a fixed time in bar time. The same seed is the same day, whichever model runs it, so `?day=42&model=clef` and `?day=42` can be compared.
+
+The customers know what they meant: when the bar asks "did you mean…?", they answer yes or no, and say their order again if it was not taken (twice at most). The day's clock stands still while the bar asks. At the end, a scorecard reports orders read right, asks, drinks served and how long people waited, and the model's requests and latency, with a button to play the same day with another model.
 
 ## Resources
 

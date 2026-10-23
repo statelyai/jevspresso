@@ -43,6 +43,7 @@ function ctx(over: Partial<Omit<Bar, 'activeSteps'>> = {}): Bar {
     speed: 1,
     breakProb: { grinder: 0, groupHead: 0, steamWand: 0 },
     pendingAt: 0,
+    orderQueue: [],
     nextDrinkNo: 1,
     error: null,
     ...over,
@@ -872,5 +873,33 @@ describe('Jev as the order router', () => {
       expect(actor.getSnapshot().matches({ intake: { clarifying: 'asking' } })).toBe(true),
     );
     expect(actor.getSnapshot().context.error).toBeTruthy();
+  });
+});
+
+describe('Order intake', () => {
+  it('reads orders that come in while another is being read, in turn, none dropped', async () => {
+    const machine = espressoBarMachine.provide({
+      actors: {
+        chaos: silent,
+        barista: silent,
+        parseOrderActor: createAsyncLogic<ParsedOrder, { text: string }>({
+          run: async ({ input }) => {
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            return { items: [{ drink: input.text as Drink['drink'], qty: 1, decaf: false, iced: false }], intent: 'order', confidence: 0.9, latencyMs: 20, raw: {}, text: input.text };
+          },
+        }),
+      },
+    });
+    const actor = createActor(machine, { input: ctx() }).start();
+    running.push(actor);
+    actor.send({ type: 'order.submit', text: 'latte', at: 1 });
+    actor.send({ type: 'order.submit', text: 'mocha', at: 2 });
+    actor.send({ type: 'order.submit', text: 'espresso', at: 3 });
+    await vi.waitFor(() => expect(actor.getSnapshot().context.drinks).toHaveLength(3));
+    expect(actor.getSnapshot().context.drinks.map((d) => [d.drink, d.orderedAt, d.orderText])).toEqual([
+      ['latte', 1, 'latte'],
+      ['mocha', 2, 'mocha'],
+      ['espresso', 3, 'espresso'],
+    ]);
   });
 });

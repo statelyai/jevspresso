@@ -23,8 +23,8 @@ export interface IngredientsProps {
   inventory: InventoryType;
   /** The ingredient the barista is refilling: it stays lit, the rest step back. */
   restocking?: Ingredient;
-  /** Set how much of an ingredient there is: none (all the way left) up to full. */
-  onStock: (ingredient: Ingredient, amount: number) => void;
+  /** Set how much of an ingredient there is: none (all the way left) up to full. Without it, the levels are only shown. */
+  onStock?: (ingredient: Ingredient, amount: number) => void;
 }
 
 /**
@@ -43,7 +43,7 @@ function StockSlider({
   value: number;
   max: number;
   color: string;
-  onSet: (amount: number) => void;
+  onSet?: (amount: number) => void;
 }) {
   const [draft, setDraft] = useState<number | null>(null);
   // The value being dragged to, for the release, whatever React has rendered by then.
@@ -51,7 +51,7 @@ function StockSlider({
   const shown = draft ?? value;
   const commit = () => {
     if (pending.current === null) return;
-    onSet(pending.current);
+    onSet?.(pending.current);
     pending.current = null;
     setDraft(null);
   };
@@ -64,6 +64,7 @@ function StockSlider({
       step={max / 100}
       value={shown}
       aria-label={`${label} in stock`}
+      disabled={!onSet}
       onChange={(e) => {
         pending.current = Number(e.target.value);
         setDraft(pending.current);
@@ -117,7 +118,7 @@ export function Ingredients({ inventory, restocking, onStock }: IngredientsProps
               value={value}
               max={max}
               color={out ? '#f0565f' : low ? '#f4a261' : color}
-              onSet={(n) => onStock(key as Ingredient, n)}
+              onSet={onStock ? (n) => onStock(key as Ingredient, n) : undefined}
             />
           </li>
         );

@@ -57,8 +57,11 @@ function targetsInSource(source: Node, fn: unknown): Node[] {
   return [...found];
 }
 
+/** A state's path below the machine: its id without the machine's (a machine with no id of its own adds none). */
+const pathOf = (t: Node) => (t.machine.id ? t.id.slice(t.machine.id.length + 1) : t.id);
+
 /** A target as said from where the transition starts: a sibling by name, else its path below the machine. */
-const nameOf = (source: Node, t: Node) => (t.parent === source.parent ? t.key : t.id.slice(source.machine.id.length + 1));
+const nameOf = (source: Node, t: Node) => (t.parent === source.parent ? t.key : pathOf(t));
 
 /**
  * Where a transition goes: its declared target; for one written as a
@@ -184,7 +187,9 @@ export function machineMap(snapshot: JevSnapshot): string {
     const pad = '  '.repeat(depth);
     const kind = node.type === 'parallel' ? ' (all at once)' : Object.keys(node.states).length ? ' (one at a time)' : '';
     const mark = depth > 0 && active.has(node.id) ? '* ' : '';
-    lines.push(`${pad}${mark}${node.key}${kind}${node.description ? ` — ${node.description}` : ''}`);
+    // A machine with no id of its own is the machine.
+    const name = depth === 0 ? node.key || '(machine)' : node.key;
+    lines.push(`${pad}${mark}${name}${kind}${node.description ? ` — ${node.description}` : ''}`);
     for (const [event, defs] of node.transitions) {
       if (event.startsWith('xstate.')) continue;
       for (const def of defs) lines.push(`${pad}    on ${transitionLine(node, event, def)}`);
